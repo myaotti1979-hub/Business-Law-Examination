@@ -1,4 +1,4 @@
-const CACHE_NAME = 'houmu-v1';
+const CACHE_NAME = 'houmu-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -22,16 +22,26 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network-first for API calls, cache-first for assets
+  // Skip non-GET and API calls
+  if (e.request.method !== 'GET') return;
   if (e.request.url.includes('generativelanguage.googleapis.com')) {
     e.respondWith(fetch(e.request));
     return;
   }
+  if (e.request.url.includes('fonts.googleapis.com') || e.request.url.includes('fonts.gstatic.com')) {
+    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+    return;
+  }
+  // For app assets: cache-first, but only cache valid responses
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).then(res => {
-      const clone = res.clone();
-      caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-      return res;
-    }))
+    caches.match(e.request).then(cached => {
+      if (cached) return cached;
+      return fetch(e.request).then(res => {
+        if (!res || res.status !== 200) return res;
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+        return res;
+      });
+    }).catch(() => caches.match('./index.html'))
   );
 });
