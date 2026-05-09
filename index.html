@@ -106,7 +106,7 @@ body.offline .offline-badge{display:block}
 // ═══ App State ═══
 const S = {
   view: 'home', data: {}, laws: {},
-  apiKey: '', keyInput: '',
+  apiKey: '', apiKeyPro: '', keyInput: '', keyInputPro: '', geminiModel: 'gemini-3.1-flash-lite',
   // quiz
   qs: [], ci: 0, sel: null, answered: false, score: 0, hist: [], revI: null,
   // grade1
@@ -199,6 +199,8 @@ async function loadData() {
     S.laws = laws;
     S.data = { g2, g1, tr, textbook };
     try { S.apiKey = localStorage.getItem('gemini-key') || ''; } catch(e) {}
+    try { S.apiKeyPro = localStorage.getItem('gemini-key-pro') || ''; } catch(e) {}
+    try { S.geminiModel = localStorage.getItem('gemini-model') || 'gemini-3.1-flash-lite'; } catch(e) {}
     loadProgress();
     render();
   } catch(e) {
@@ -229,9 +231,11 @@ function go(view) { S.view=view; render(); window.scrollTo(0,0); }
 function goHome() { stopTimer(); go('home'); }
 
 // ═══ Gemini API ═══
-async function callGemini(scenario, subQs, essays, model) {
+async function callGemini(scenario, subQs, essays, model, useProModel) {
+  var modelId = useProModel ? 'gemini-3.1-pro-preview' : S.geminiModel;
+  var key = useProModel && S.apiKeyPro ? S.apiKeyPro : S.apiKey;
   const prompt = "あなたはビジネス実務法務検定1級の採点官です。JSON形式のみで出力。{\"totalScore\":<0-50>,\"breakdown\":{\"legalBasis\":<0-15>,\"application\":<0-15>,\"logic\":<0-10>,\"conclusion\":<0-10>},\"subEvals\":[{\"subQ\":<番号>,\"score\":<点>,\"strengths\":\"良い点\",\"weaknesses\":\"改善点\",\"missingPoints\":\"漏れ論点\"}],\"overallComment\":\"総合講評\",\"passLevel\":\"<A|B|C|D>\"}\n\n【事例】\n"+scenario+"\n\n【設問と解答】\n"+subQs.map((sq,i)=>sq+"\n"+(essays[i]||"（未回答）")).join("\n\n")+"\n\n【模範解答】\n"+model+"\n\nJSON:";
-  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+S.apiKey, {
+  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+modelId+':generateContent?key='+key, {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:4096}})
   });
@@ -287,12 +291,13 @@ function next1() {
   else { S.g1ci++; S.essay=['','','']; render(); window.scrollTo(0,0); }
 }
 
-async function doGrade() {
-  if (!S.apiKey) { alert('設定からGemini APIキーを登録してください'); return; }
+async function doGrade(useProModel) {
+  if (!S.apiKey && !S.apiKeyPro) { alert('設定からGemini APIキーを登録してください'); return; }
   S.grading=true; render();
   try {
     const q=S.g1qs[S.g1ci];
-    S.gradeRes = await callGemini(q.scenario,q.subQs,S.essay,q.modelAns);
+    S.gradeRes = await callGemini(q.scenario,q.subQs,S.essay,q.modelAns,useProModel);
+    S.gradeRes._model = useProModel ? 'gemini-3.1-pro-preview' : S.geminiModel;
   } catch(e) { S.gradeRes={error:e.message}; }
   S.grading=false; render();
 }
@@ -329,7 +334,7 @@ function render() {
     const trn=(S.data.tr?.grade2?.length||0)+(S.data.tr?.grade1?.length||0);
     h += '<div class="info"><b>学習→トレーニング→演習</b>の3ステップで合格力を積み上げます。<br>';
     h += '<span class="tg tg-b">2級</span>多肢選択 <span class="tg tg-r">1級</span>論述 <span class="tg tg-o">練習</span>パーツ練習<br>';
-    h += S.apiKey ? '<span style="color:var(--ok)">✓ Gemini API登録済</span>' : '<span style="color:var(--ng)">⚠ APIキー未登録 → <a onclick="go(\'settings\')">設定</a></span>';
+    h += S.apiKey ? '<span style="color:var(--ok)">✓ API登録済' + (S.apiKeyPro ? ' + 💎Pro' : '') + '</span>' : '<span style="color:var(--ng)">⚠ APIキー未登録 → <a onclick="go(\'settings\')">設定</a></span>';
     h += '</div>';
     // Streak display
     if (S.progress.streak > 0 || S.progress.totalSessions > 0) {
@@ -353,11 +358,30 @@ function render() {
 
   } else if (S.view==='settings') {
     h += '<div class="bc"><a onclick="goHome()">ホーム</a> › 設定</div>';
-    h += '<div class="stitle">Gemini APIキー</div>';
-    h += '<div class="info">1級AI添削に必要。<a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--bl)">Google AI Studio</a>で無料取得可。</div>';
-    h += '<input class="inp" type="password" id="keyinp" placeholder="APIキー" value="'+esc(S.apiKey)+'">';
-    h += '<div style="display:flex;gap:7px;margin-top:7px"><button class="btn bp" onclick="const v=document.getElementById(\'keyinp\').value.trim();if(v){S.apiKey=v;try{localStorage.setItem(\'gemini-key\',v)}catch(e){}goHome();}">保存</button><button class="btn bo" onclick="goHome()">戻る</button></div>';
-    if (S.apiKey) h += '<div style="margin-top:10px;font-size:16px;color:var(--ok)">✓ 登録済: '+S.apiKey.substring(0,8)+'...</div>';
+    h += '<div class="stitle">🆓 無料枠 API設定</div>';
+    h += '<div class="info">日常の添削用。<a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--bl)">Google AI Studio</a>で無料取得。gemini-3.1-flash-lite等が利用可。</div>';
+    h += '<input class="inp" type="password" id="keyinp" placeholder="無料枠のAPIキー" value="'+esc(S.apiKey)+'">';
+    h += '<div class="stitle" style="margin-top:18px">💎 Pro枠 API設定（任意）</div>';
+    h += '<div class="info">高精度添削用。同じキーでもOK。gemini-3.1-pro-preview等の有料モデルに使用。未設定なら無料枠キーを使用。</div>';
+    h += '<input class="inp" type="password" id="keyinppro" placeholder="Pro枠のAPIキー（任意・同じでもOK）" value="'+esc(S.apiKeyPro)+'">';
+    h += '<div class="stitle" style="margin-top:18px">デフォルトモデル</div>';
+    var models = [
+      {id:'gemini-3.1-flash-lite',name:'🆓 3.1 Flash-Lite（無料・超高速）'},
+      {id:'gemini-2.5-flash',name:'🆓 2.5 Flash（無料・安定・推奨）'},
+      {id:'gemini-3-flash-preview',name:'🆓 3 Flash Preview（無料・高性能）'},
+      {id:'gemini-2.5-pro',name:'💎 2.5 Pro（有料・高精度）'},
+      {id:'gemini-3.1-pro-preview',name:'💎 3.1 Pro Preview（有料・最高精度）'},
+    ];
+    models.forEach(function(m) {
+      var checked = S.geminiModel === m.id;
+      h += '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:'+(checked?'#e8f0fe':'#fff')+';border:1.5px solid '+(checked?'var(--bl)':'var(--bg2)')+';border-radius:var(--r);margin-bottom:5px;cursor:pointer;font-size:15px">';
+      h += '<input type="radio" name="model" value="'+m.id+'" '+(checked?'checked':'')+' onclick="S.geminiModel=\''+m.id+'\'" style="accent-color:var(--bl);width:18px;height:18px">';
+      h += m.name+'</label>';
+    });
+    h += '<div style="display:flex;gap:7px;margin-top:10px"><button class="btn bp" onclick="S.apiKey=document.getElementById(\'keyinp\').value.trim();S.apiKeyPro=document.getElementById(\'keyinppro\').value.trim();try{localStorage.setItem(\'gemini-key\',S.apiKey);localStorage.setItem(\'gemini-key-pro\',S.apiKeyPro);localStorage.setItem(\'gemini-model\',S.geminiModel)}catch(e){}goHome();">保存</button><button class="btn bo" onclick="goHome()">戻る</button></div>';
+    if (S.apiKey) h += '<div style="margin-top:10px;font-size:14px;color:var(--ok)">✓ 無料枠: '+S.apiKey.substring(0,8)+'...</div>';
+    if (S.apiKeyPro) h += '<div style="font-size:14px;color:var(--bl)">✓ Pro枠: '+S.apiKeyPro.substring(0,8)+'...</div>';
+    h += '<div style="margin-top:4px;font-size:14px;color:var(--ink2)">モデル: '+S.geminiModel+'</div>';
 
   } else if (S.view==='g2menu') {
     const tr2=S.data.tr?.grade2||[];
@@ -573,13 +597,16 @@ function render() {
     });
     h += '<div style="margin-top:14px;display:flex;gap:7px;flex-wrap:wrap">';
     if(!S.showMdl) h += '<button class="btn bo" onclick="S.showMdl=true;render();">模範解答</button>';
-    if(S.apiKey&&!S.gradeRes) h += '<button class="btn bg" onclick="[0,1,2].forEach(i=>{const el=document.getElementById(\'essay\'+i);if(el)S.essay[i]=el.value;});doGrade();" '+(S.grading?'disabled':'')+'>🤖 '+(S.grading?'添削中...':'AI添削')+'</button>';
+    if((S.apiKey||S.apiKeyPro)&&!S.gradeRes) {
+      h += '<button class="btn bg" onclick="[0,1,2].forEach(i=>{const el=document.getElementById(\'essay\'+i);if(el)S.essay[i]=el.value;});doGrade(false);" '+(S.grading?'disabled':'')+'>🤖 '+(S.grading?'添削中...':'Flash添削')+'</button>';
+      if(S.apiKeyPro) h += '<button class="btn bp" style="background:var(--gd)" onclick="[0,1,2].forEach(i=>{const el=document.getElementById(\'essay\'+i);if(el)S.essay[i]=el.value;});doGrade(true);" '+(S.grading?'disabled':'')+'>💎 Pro添削</button>';
+    }
     h += '<button class="btn bp" onclick="[0,1,2].forEach(i=>{const el=document.getElementById(\'essay\'+i);if(el)S.essay[i]=el.value;});next1();">'+(S.g1ci+1>=S.g1qs.length?'終了':'次へ →')+'</button>';
     h += '</div>';
     if(S.showMdl) h += '<div class="mdl"><div class="ml2">模範解答</div>'+esc(q.modelAns)+'</div>';
     if(S.gradeRes&&!S.gradeRes.error){
       const g=S.gradeRes;
-      h += '<div class="grd"><div class="ml2" style="color:var(--bl)">🤖 AI添削結果</div>';
+      h += '<div class="grd"><div class="ml2" style="color:var(--bl)">🤖 AI添削結果 <span style="font-size:13px;font-weight:400;color:var(--ink2)">('+(g._model||S.geminiModel)+')</span></div>';
       h += '<div class="gs"><span class="gsc">'+g.totalScore+'</span><span class="gsu">/50点</span>';
       h += '<span class="glv glv-'+g.passLevel+'">'+({A:'合格水準',B:'あと一歩',C:'基礎力不足',D:'要学習'}[g.passLevel]||'')+'</span></div>';
       if(g.breakdown)h+='<div class="gbd"><div>法的根拠:'+g.breakdown.legalBasis+'/15</div><div>あてはめ:'+g.breakdown.application+'/15</div><div>論理構成:'+g.breakdown.logic+'/10</div><div>結論:'+g.breakdown.conclusion+'/10</div></div>';
