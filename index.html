@@ -382,6 +382,8 @@ function render() {
     if (S.apiKey) h += '<div style="margin-top:10px;font-size:14px;color:var(--ok)">✓ 無料枠: '+S.apiKey.substring(0,8)+'...</div>';
     if (S.apiKeyPro) h += '<div style="font-size:14px;color:var(--bl)">✓ Pro枠: '+S.apiKeyPro.substring(0,8)+'...</div>';
     h += '<div style="margin-top:4px;font-size:14px;color:var(--ink2)">モデル: '+S.geminiModel+'</div>';
+    h += '<div class="stitle" style="margin-top:28px;color:var(--ng)">⚠ データ管理</div>';
+    h += '<button class="btn bo" style="border-color:var(--ng);color:var(--ng)" onclick="if(confirm(\'学習履歴（正答率・連続日数・弱点データ）をすべてリセットします。\\nこの操作は元に戻せません。\\n\\n本当にリセットしますか？\')){S.progress={g2:{},streak:0,lastDate:\'\',totalSessions:0};saveProgress();alert(\'リセットしました\');render();}">🗑 学習履歴をリセット</button>';
 
   } else if (S.view==='g2menu') {
     const tr2=S.data.tr?.grade2||[];
