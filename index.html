@@ -189,15 +189,16 @@ async function fetchJSON(path) {
 
 async function loadData() {
   try {
-    const [laws, g2, g1, tr, textbook] = await Promise.all([
+    const [laws, g2, g1, tr, textbook, mock] = await Promise.all([
       fetchJSON('data/laws.json'),
       fetchJSON('data/grade2.json'),
       fetchJSON('data/grade1.json'),
       fetchJSON('data/training.json'),
       fetchJSON('data/textbook.json'),
+      fetchJSON('data/mock.json'),
     ]);
     S.laws = laws;
-    S.data = { g2, g1, tr, textbook };
+    S.data = { g2, g1, tr, textbook, mock };
     try { S.apiKey = localStorage.getItem('gemini-key') || ''; } catch(e) {}
     try { S.apiKeyPro = localStorage.getItem('gemini-key-pro') || ''; } catch(e) {}
     try { S.geminiModel = localStorage.getItem('gemini-model') || 'gemini-3.1-flash-lite'; } catch(e) {}
@@ -250,14 +251,22 @@ function start2(mode) {
   updateStreak();
   let pool;
   if (mode === 'weak') {
-    // 弱点集中モード: 間違えた問題を優先
     pool = getWeakQuestions([...S.data.g2]).slice(0, 20);
-  } else if (mode === 'full') {
+  } else if (mode === 'all') {
     pool = shuffle([...S.data.g2]);
   } else {
     pool = shuffle([...S.data.g2]).slice(0, 15);
   }
-  Object.assign(S, {qs:pool,ci:0,sel:null,answered:false,score:0,hist:[],revI:null});
+  Object.assign(S, {qs:pool,ci:0,sel:null,answered:false,score:0,hist:[],revI:null,quizMode:mode});
+  startTimer(); go('quiz2');
+}
+
+function startMock(mockId) {
+  updateStreak();
+  var exam = (S.data.mock||[]).find(function(m){ return m.id === mockId; });
+  if (!exam) return;
+  var pool = [...exam.questions];
+  Object.assign(S, {qs:pool,ci:0,sel:null,answered:false,score:0,hist:[],revI:null,quizMode:'mock',mockTitle:exam.title});
   startTimer(); go('quiz2');
 }
 
@@ -389,15 +398,19 @@ function render() {
     const tr2=S.data.tr?.grade2||[];
     h += '<div class="bc"><a onclick="goHome()">ホーム</a> › <span class="tg tg-b">2級</span></div>';
     h += '<div class="stitle">2級 — 学習メニュー</div>';
-    h += '<div class="advice"><h3>📚 2級の学習ポイント</h3>民法・商法・会社法が約50%。条文の正確な理解が合否を分けます。<br>まず「トレーニング」で基礎固め→「演習」で本試験形式に挑戦。<br>解説の<b>「📜参照条文」</b>で条文原文を必ず確認。</div>';
+    h += '<div class="advice"><h3>📚 2級の学習ポイント</h3><b>本試験形式</b>: 40問/90分/100点満点（各2.5点）/70点合格<br>①トレーニング→②演習→③模擬試験の順で学習。</div>';
     h += '<div class="ml">';
-    h += '<button class="cb or" onclick="startTr(S.data.tr.grade2,\'all\')"><span>🏋️ 2級トレーニング</span><span class="n">'+tr2.length+'問</span></button>';
-    h += '<button class="cb all" onclick="start2(\'full\')"><span>本試験モード（全問）</span><span class="n">タイマー付</span></button>';
-    h += '<button class="cb" onclick="start2(\'practice\')"><span>練習モード（15問）</span><span class="n">ランダム</span></button>';
+    h += '<button class="cb or" onclick="startTr(S.data.tr.grade2,\'all\')"><span>🏋️ トレーニング（正誤判断・条文番号）</span><span class="n">'+tr2.length+'問</span></button>';
+    h += '<button class="cb" onclick="start2(\'practice\')"><span>📝 演習（15問ランダム）</span><span class="n">練習</span></button>';
+    h += '<button class="cb" onclick="start2(\'all\')"><span>📝 演習（全'+((S.data.g2||[]).length)+'問）</span><span class="n">総復習</span></button>';
     var weakCount = getWeakQuestions([...(S.data.g2||[])]).filter(function(q){var r=S.progress.g2[q.id];return r&&r.wrong>r.correct;}).length;
-    if (weakCount > 0) h += '<button class="cb" style="border-color:var(--ng);color:var(--ng)" onclick="start2(\'weak\')"><span>🔥 弱点集中モード</span><span class="n">'+weakCount+'問</span></button>';
-    h += '<button class="cb" style="border-color:var(--or)" onclick="go(\'dash\')"><span>📊 分野別分析ダッシュボード</span><span class="n"></span></button>';
-    h += '<button class="cb" style="border-color:var(--gd)" onclick="go(\'textbook\')"><span>📖 学習テキスト（全8章）</span><span class="n"></span></button>';
+    if (weakCount > 0) h += '<button class="cb" style="border-color:var(--ng);color:var(--ng)" onclick="start2(\'weak\')"><span>🔥 弱点集中</span><span class="n">'+weakCount+'問</span></button>';
+    // 模擬試験
+    (S.data.mock||[]).forEach(function(m) {
+      h += '<button class="cb all" onclick="startMock('+m.id+')"><span>🎯 '+m.title+'（40問/90分/70点合格）</span><span class="n">本番想定</span></button>';
+    });
+    h += '<button class="cb" style="border-color:var(--or)" onclick="go(\'dash\')"><span>📊 分析ダッシュボード</span><span class="n"></span></button>';
+    h += '<button class="cb" style="border-color:var(--gd)" onclick="go(\'textbook\')"><span>📖 学習テキスト</span><span class="n"></span></button>';
     h += '</div>';
 
   } else if (S.view==='g1menu') {
@@ -620,11 +633,25 @@ function render() {
 
   } else if (S.view==='res2') {
     const pct=S.qs.length?Math.round(S.score/S.qs.length*100):0;
-    h += '<div class="bc"><a onclick="goHome()">ホーム</a> › 2級結果</div>';
-    h += '<div class="rc"><div class="rs">'+S.score+'<span>/'+S.qs.length+'</span></div>';
-    h += '<div class="rl">'+Math.round(S.score*2.5)+'点/'+Math.round(S.qs.length*2.5)+'点</div>';
-    h += '<div class="rp '+(pct>=70?'rph':pct>=40?'rpm':'rpl')+'">'+pct+'%'+(pct>=70?' 合格ライン到達':'')+'</div>';
-    h += '<div class="rm">所要時間: '+fmt(S.elapsed)+'</div></div>';
+    const isExam = S.quizMode==='mock';
+    const points = Math.round(S.score*2.5);
+    const totalPoints = Math.round(S.qs.length*2.5);
+    const passed = isExam ? points >= 70 : pct >= 70;
+    h += '<div class="bc"><a onclick="goHome()">ホーム</a> › '+(isExam ? S.mockTitle||'模擬試験' : '2級')+'結果</div>';
+    if (isExam) {
+      h += '<div class="rc" style="border-color:'+(passed?'var(--ok)':'var(--ng)') +'">';
+      h += '<div style="font-size:15px;font-weight:700;color:'+(passed?'var(--ok)':'var(--ng)')+';margin-bottom:6px">'+(passed?'🎉 合格':'不合格')+'</div>';
+      h += '<div class="rs">'+points+'<span>/100点</span></div>';
+      h += '<div class="rl">正解'+S.score+'/'+S.qs.length+'問（各2.5点）</div>';
+      h += '<div class="rp '+(passed?'rph':'rpl')+'">合格ライン: 70点'+(passed?' ✓ 到達':' ✗ 未到達')+'</div>';
+      h += '<div class="rm">所要時間: '+fmt(S.elapsed)+' / 制限: 90分'+(S.elapsed>5400?' ⚠ 超過':'')+'</div>';
+      h += '</div>';
+    } else {
+      h += '<div class="rc"><div class="rs">'+S.score+'<span>/'+S.qs.length+'</span></div>';
+      h += '<div class="rl">'+points+'点/'+totalPoints+'点</div>';
+      h += '<div class="rp '+(pct>=70?'rph':pct>=40?'rpm':'rpl')+'">'+pct+'%'+(pct>=70?' 合格ライン相当':'')+'</div>';
+      h += '<div class="rm">所要時間: '+fmt(S.elapsed)+'</div></div>';
+    }
     h += '<div class="stitle">解答一覧（タップで解説＋条文参照）</div>';
     h += '<div class="rvl">';
     S.qs.forEach((q,i)=>{h+='<div class="rvi" onclick="S.revI=S.revI==='+i+'?null:'+i+';render();"><span class="rvd '+(S.hist[i]?.ok?'ok':'ng')+'"></span><span class="rvt">問'+(i+1)+' ['+q.a+'] '+esc(q.q.substring(0,30))+'…</span><span style="color:#999">'+(S.revI===i?'▲':'▼')+'</span></div>';});

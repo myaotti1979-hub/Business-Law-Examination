@@ -1,4 +1,4 @@
-const CACHE_NAME = 'houmu-v15';
+const CACHE_NAME = 'houmu-v18';
 const ASSETS = [
   './',
   './index.html',
@@ -7,7 +7,8 @@ const ASSETS = [
   './data/grade2.json',
   './data/grade1.json',
   './data/training.json',
-  './data/textbook.json'
+  './data/textbook.json',
+  './data/mock.json'
 ];
 
 self.addEventListener('install', e => {
