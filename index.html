@@ -98,7 +98,7 @@ body.offline .offline-badge{display:block}
 <body>
 <div class="offline-badge">📴 オフラインモード</div>
 <div id="app" class="app">
-  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v2.0</span></p></div>
+  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v2.1</span></p></div>
   <div style="text-align:center;padding:40px;color:var(--ink2)">読み込み中...</div>
 </div>
 
@@ -302,6 +302,48 @@ function next2() {
   else { S.ci++; S.sel=null; S.answered=false; render(); window.scrollTo(0,0); }
 }
 
+// セクション関連問題の抽出＆ミニクイズ
+function startSectionQuiz(grade, ch, secIdx) {
+  var chapters = grade===1 ? (S.data.textbook&&S.data.textbook.grade1||[]) : (S.data.textbook&&S.data.textbook.grade2||[]);
+  var chapter = chapters.find(function(c){ return c.ch === ch; });
+  if (!chapter || !chapter.sections[secIdx]) return;
+  var sec = chapter.sections[secIdx];
+  // キーワード抽出: セクションタイトル + 条文番号
+  var keywords = sec.title.replace(/[（）()・\s]/g,' ').split(/\s+/).filter(function(w){return w.length>=2;});
+  if (sec.laws) sec.laws.forEach(function(l){ var m=l.match(/\d+/); if(m) keywords.push(m[0]+'条'); });
+  // 演習問題+トレーニング問題から関連問題を検索
+  var pool = [];
+  var g2 = S.data.g2 || [];
+  var tr2 = (S.data.tr && S.data.tr.grade2) || [];
+  // 演習問題から検索(quiz形式に統一)
+  g2.forEach(function(q) {
+    var text = q.q + (q.ex||'') + (q.s?q.s.join(''):'') + (q.ch?q.ch.join(''):'');
+    var match = keywords.some(function(kw){ return text.indexOf(kw)>=0; });
+    if (match) pool.push({t:q.t==='tf'?'tf':'quiz', orig:q});
+  });
+  // トレーニング問題から検索
+  tr2.forEach(function(q) {
+    var text = q.q + (q.ex||'') + (q.opts?q.opts.join(''):'');
+    var match = keywords.some(function(kw){ return text.indexOf(kw)>=0; });
+    if (match) pool.push({t:'tr', orig:q});
+  });
+  // 5問をランダム選出
+  pool = shuffle(pool).slice(0, 5);
+  if (pool.length === 0) { alert('関連する問題が見つかりませんでした'); return; }
+  // トレーニング形式の問題に変換して出題
+  var trQs = pool.map(function(p) {
+    if (p.t === 'tr') return p.orig;
+    var q = p.orig;
+    if (q.t === 'combo') {
+      return {t:'article', q:q.q+'\n\n'+q.s.join('\n'), opts:q.c, ans:q.ans, ex:q.ex, laws:q.laws||[]};
+    } else {
+      return {t:'article', q:q.q, opts:q.ch, ans:q.ans, ex:q.ex, laws:q.laws||[]};
+    }
+  });
+  Object.assign(S, {trQs:trQs,trCi:0,trSel:[],trDone:false,trScore:0,trHist:[],trAns:'',sectionReturn:{grade:grade,ch:ch}});
+  go('train');
+}
+
 function start1(mode) {
   let pool;
   if (mode==='common') pool = S.data.g1.common;
@@ -354,7 +396,7 @@ function trNext() {
 // ═══ Render ═══
 function render() {
   const app = document.getElementById('app');
-  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v2.0</span></p></div>';
+  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v2.1</span></p></div>';
 
   if (S.view==='home') {
     const g2n=S.data.g2?.length||0, g1n=(S.data.g1?.common?.length||0)+(S.data.g1?.selection?.length||0);
@@ -604,6 +646,8 @@ function render() {
         if (sec.laws && sec.laws.length > 0) {
           h += lawRefHTML(sec.laws);
         }
+        // Section quiz button
+        h += '<button onclick="startSectionQuiz('+S.textGrade+','+chapter.ch+','+secIdx+')" style="margin-top:10px;padding:8px 16px;border-radius:var(--r);border:1.5px solid var(--or);background:#fff;color:var(--or);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;width:100%">📝 この内容を5問で練習</button>';
         h += '</div>';
       });
       h += '<div class="ctr"><button class="btn bo" onclick="go(\'textbook\')">テキスト一覧</button></div>';
