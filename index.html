@@ -98,7 +98,7 @@ body.offline .offline-badge{display:block}
 <body>
 <div class="offline-badge">📴 オフラインモード</div>
 <div id="app" class="app">
-  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v1.9</span></p></div>
+  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v2.0</span></p></div>
   <div style="text-align:center;padding:40px;color:var(--ink2)">読み込み中...</div>
 </div>
 
@@ -118,7 +118,7 @@ const S = {
   // progress tracking
   progress: { g2: {}, streak: 0, lastDate: '', totalSessions: 0 },
   // textbook
-  textCh: 1, textGrade: 2,
+  textCh: 1, textGrade: 2, textRead: {},
 };
 
 // ═══ Progress Tracking ═══
@@ -127,9 +127,27 @@ function loadProgress() {
     const p = localStorage.getItem('houmu-progress');
     if (p) S.progress = JSON.parse(p);
   } catch(e) {}
+  try {
+    const t = localStorage.getItem('houmu-textread');
+    if (t) S.textRead = JSON.parse(t);
+  } catch(e) {}
 }
 function saveProgress() {
   try { localStorage.setItem('houmu-progress', JSON.stringify(S.progress)); } catch(e) {}
+}
+function toggleTextRead(key) {
+  S.textRead[key] = !S.textRead[key];
+  try { localStorage.setItem('houmu-textread', JSON.stringify(S.textRead)); } catch(e) {}
+  render();
+}
+function getTextProgress(grade, ch) {
+  var chapters = grade===1 ? (S.data.textbook&&S.data.textbook.grade1||[]) : (S.data.textbook&&S.data.textbook.grade2||[]);
+  var chapter = chapters.find(function(c){ return c.ch === ch; });
+  if (!chapter) return {done:0,total:0};
+  var total = chapter.sections.length;
+  var done = 0;
+  chapter.sections.forEach(function(sec,i){ if(S.textRead[grade+'-'+ch+'-'+i]) done++; });
+  return {done:done,total:total};
 }
 function recordResult(qId, correct, area) {
   if (!S.progress.g2[qId]) S.progress.g2[qId] = { correct: 0, wrong: 0, last: '', area: area };
@@ -336,7 +354,7 @@ function trNext() {
 // ═══ Render ═══
 function render() {
   const app = document.getElementById('app');
-  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v1.9</span></p></div>';
+  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v2.0</span></p></div>';
 
   if (S.view==='home') {
     const g2n=S.data.g2?.length||0, g1n=(S.data.g1?.common?.length||0)+(S.data.g1?.selection?.length||0);
@@ -532,20 +550,24 @@ function render() {
     // 2級
     h += '<div style="font-family:\'Noto Serif JP\',serif;font-size:19px;font-weight:700;margin:16px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--bl);color:var(--bl)">2級テキスト</div>';
     ((S.data.textbook&&S.data.textbook.grade2)||[]).forEach(function(ch) {
-      h += '<div style="background:#fff;border:1.5px solid var(--bg2);border-radius:var(--r);margin-bottom:8px;cursor:pointer" onclick="S.textCh='+ch.ch+';S.textGrade=2;go(\'textch\')">';
+      var p = getTextProgress(2, ch.ch);
+      var allDone = p.done === p.total && p.total > 0;
+      h += '<div style="background:#fff;border:1.5px solid '+(allDone?'var(--ok)':'var(--bg2)')+';border-radius:var(--r);margin-bottom:8px;cursor:pointer" onclick="S.textCh='+ch.ch+';S.textGrade=2;go(\'textch\')">';
       h += '<div style="padding:14px;display:flex;align-items:center;gap:10px">';
-      h += '<span style="background:var(--bl);color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0">'+ch.ch+'</span>';
-      h += '<div><div style="font-size:18px;font-weight:700">'+esc(ch.title)+'</div>';
-      h += '<div style="font-size:15px;color:var(--ink2)">'+ch.sections.length+'セクション</div></div></div></div>';
+      h += '<span style="background:'+(allDone?'var(--ok)':'var(--bl)')+';color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0">'+(allDone?'✓':ch.ch)+'</span>';
+      h += '<div style="flex:1"><div style="font-size:18px;font-weight:700">'+esc(ch.title)+'</div>';
+      h += '<div style="font-size:14px;color:'+(allDone?'var(--ok)':'var(--ink2)')+'">'+p.done+'/'+p.total+' 完了</div></div></div></div>';
     });
     // 1級
     h += '<div style="font-family:\'Noto Serif JP\',serif;font-size:19px;font-weight:700;margin:20px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--ng);color:var(--ng)">1級テキスト（論述対策）</div>';
     ((S.data.textbook&&S.data.textbook.grade1)||[]).forEach(function(ch) {
-      h += '<div style="background:#fff;border:1.5px solid var(--bg2);border-radius:var(--r);margin-bottom:8px;cursor:pointer" onclick="S.textCh='+ch.ch+';S.textGrade=1;go(\'textch\')">';
+      var p = getTextProgress(1, ch.ch);
+      var allDone = p.done === p.total && p.total > 0;
+      h += '<div style="background:#fff;border:1.5px solid '+(allDone?'var(--ok)':'var(--bg2)')+';border-radius:var(--r);margin-bottom:8px;cursor:pointer" onclick="S.textCh='+ch.ch+';S.textGrade=1;go(\'textch\')">';
       h += '<div style="padding:14px;display:flex;align-items:center;gap:10px">';
-      h += '<span style="background:var(--ng);color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0">'+ch.ch+'</span>';
-      h += '<div><div style="font-size:18px;font-weight:700">'+esc(ch.title)+'</div>';
-      h += '<div style="font-size:15px;color:var(--ink2)">'+ch.sections.length+'セクション</div></div></div></div>';
+      h += '<span style="background:'+(allDone?'var(--ok)':'var(--ng)')+';color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0">'+(allDone?'✓':ch.ch)+'</span>';
+      h += '<div style="flex:1"><div style="font-size:18px;font-weight:700">'+esc(ch.title)+'</div>';
+      h += '<div style="font-size:14px;color:'+(allDone?'var(--ok)':'var(--ink2)')+'">'+p.done+'/'+p.total+' 完了</div></div></div></div>';
     });
 
   } else if (S.view==='textch') {
@@ -556,9 +578,16 @@ function render() {
       var gradeColor = S.textGrade===1 ? 'var(--ng)' : 'var(--bl)';
       h += '<div class="bc"><a onclick="goHome()">ホーム</a> › <a onclick="go(\'textbook\')">テキスト</a> › <span style="color:'+gradeColor+';font-weight:700">'+gradeLabel+'</span> › 第'+chapter.ch+'章</div>';
       h += '<div class="stitle">第'+chapter.ch+'章 '+esc(chapter.title)+'</div>';
-      chapter.sections.forEach(function(sec) {
-        h += '<div style="background:#fff;border:1.5px solid var(--bg2);border-radius:var(--r);padding:16px;margin-bottom:12px">';
-        h += '<div style="font-family:\'Noto Serif JP\',serif;font-size:19px;font-weight:700;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--gd)">'+esc(sec.title)+'</div>';
+      var chProg = getTextProgress(S.textGrade, chapter.ch);
+      h += '<div style="font-size:15px;color:var(--ink2);margin-bottom:12px">進捗: '+chProg.done+'/'+chProg.total+' セクション完了</div>';
+      chapter.sections.forEach(function(sec, secIdx) {
+        var key = S.textGrade+'-'+chapter.ch+'-'+secIdx;
+        var done = S.textRead[key];
+        h += '<div style="background:#fff;border:1.5px solid '+(done?'var(--ok)':'var(--bg2)')+';border-radius:var(--r);padding:16px;margin-bottom:12px">';
+        h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--gd)">';
+        h += '<span style="font-family:\'Noto Serif JP\',serif;font-size:19px;font-weight:700">'+esc(sec.title)+'</span>';
+        h += '<button onclick="event.stopPropagation();toggleTextRead(\''+key+'\')" style="flex-shrink:0;padding:5px 12px;border-radius:20px;border:1.5px solid '+(done?'var(--ok)':'var(--bg2)')+';background:'+(done?'var(--ok)':'#fff')+';color:'+(done?'#fff':'var(--ink2)')+';font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">'+(done?'✓ 済':'未学習')+'</button>';
+        h += '</div>';
         // Content with **bold** rendering
         var content = esc(sec.content).replace(/\*\*(.+?)\*\*/g, '<b style="color:var(--ink);background:#fef3cd;padding:1px 3px;border-radius:2px">$1</b>');
         h += '<div style="font-size:17px;line-height:2.0;margin-bottom:12px">'+content+'</div>';
