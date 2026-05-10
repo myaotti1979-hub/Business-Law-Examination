@@ -1,4 +1,4 @@
-const CACHE_NAME = 'houmu-v22';
+const CACHE_NAME = 'houmu-v23';
 const ASSETS = [
   './',
   './index.html',
@@ -24,24 +24,44 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Skip non-GET and API calls
   if (e.request.method !== 'GET') return;
+
+  // API: network only
   if (e.request.url.includes('generativelanguage.googleapis.com')) {
     e.respondWith(fetch(e.request));
     return;
   }
+
+  // Fonts: cache-first
   if (e.request.url.includes('fonts.googleapis.com') || e.request.url.includes('fonts.gstatic.com')) {
     e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
     return;
   }
-  // For app assets: cache-first, but only cache valid responses
+
+  // HTML + JSON: network-first (updates reflect immediately)
+  const url = e.request.url;
+  if (url.endsWith('.html') || url.endsWith('.json') || url.endsWith('/')) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Other (icons etc): cache-first
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(res => {
-        if (!res || res.status !== 200) return res;
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+        }
         return res;
       });
     }).catch(() => caches.match('./index.html'))
