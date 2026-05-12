@@ -98,7 +98,7 @@ body.offline .offline-badge{display:block}
 <body>
 <div class="offline-badge">📴 オフラインモード</div>
 <div id="app" class="app">
-  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v2.4</span></p></div>
+  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v2.5</span></p></div>
   <div style="text-align:center;padding:40px;color:var(--ink2)">読み込み中...</div>
 </div>
 
@@ -246,7 +246,7 @@ function stopTimer() { S.running=false; if(S.timerId){clearInterval(S.timerId);S
 function renderTimer() { const el=document.getElementById('timer'); if(el) el.textContent='⏱'+fmt(S.elapsed); }
 
 // ═══ Navigation ═══
-function go(view) { S.view=view; render(); window.scrollTo(0,0); }
+function go(view) { S.view=view; S._scrolled=false; render(); window.scrollTo(0,0); }
 function goHome() { stopTimer(); go('home'); }
 
 // ═══ Gemini API ═══
@@ -366,7 +366,7 @@ function trNext() {
 // ═══ Render ═══
 function render() {
   const app = document.getElementById('app');
-  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v2.4</span></p></div>';
+  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v2.5</span></p></div>';
 
   if (S.view==='home') {
     const g2n=S.data.g2?.length||0, g1n=(S.data.g1?.common?.length||0)+(S.data.g1?.selection?.length||0);
@@ -595,7 +595,7 @@ function render() {
       chapter.sections.forEach(function(sec, secIdx) {
         var key = S.textGrade+'-'+chapter.ch+'-'+secIdx;
         var done = S.textRead[key];
-        h += '<div style="background:#fff;border:1.5px solid '+(done?'var(--ok)':'var(--bg2)')+';border-radius:var(--r);padding:16px;margin-bottom:12px">';
+        h += '<div id="sec-'+secIdx+'" style="background:#fff;border:1.5px solid '+(done?'var(--ok)':'var(--bg2)')+';border-radius:var(--r);padding:16px;margin-bottom:12px">';
         h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--gd)">';
         h += '<span style="font-family:\'Noto Serif JP\',serif;font-size:19px;font-weight:700">'+esc(sec.title)+'</span>';
         h += '<button onclick="event.stopPropagation();toggleTextRead(\''+key+'\')" style="flex-shrink:0;padding:5px 12px;border-radius:20px;border:1.5px solid '+(done?'var(--ok)':'var(--bg2)')+';background:'+(done?'var(--ok)':'#fff')+';color:'+(done?'#fff':'var(--ink2)')+';font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">'+(done?'✓ 済':'未学習')+'</button>';
@@ -715,6 +715,23 @@ function render() {
   }
 
   app.innerHTML = h;
+  // テキスト章表示時: 未学習の最初のセクションに自動スクロール
+  if (S.view === 'textch' && !S._scrolled) {
+    S._scrolled = true;
+    setTimeout(function() {
+      var chapters = S.textGrade===1 ? (S.data.textbook&&S.data.textbook.grade1||[]) : (S.data.textbook&&S.data.textbook.grade2||[]);
+      var chapter = chapters.find(function(c){ return c.ch === S.textCh; });
+      if (chapter) {
+        for (var i = 0; i < chapter.sections.length; i++) {
+          if (!S.textRead[S.textGrade+'-'+S.textCh+'-'+i]) {
+            var el = document.getElementById('sec-'+i);
+            if (el) el.scrollIntoView({behavior:'smooth', block:'start'});
+            break;
+          }
+        }
+      }
+    }, 100);
+  }
 }
 
 // ═══ PWA & Offline ═══
