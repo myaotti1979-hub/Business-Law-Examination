@@ -98,7 +98,7 @@ body.offline .offline-badge{display:block}
 <body>
 <div class="offline-badge">📴 オフラインモード</div>
 <div id="app" class="app">
-  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v3.5</span></p></div>
+  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v3.7</span></p></div>
   <div style="text-align:center;padding:40px;color:var(--ink2)">読み込み中...</div>
 </div>
 
@@ -366,7 +366,7 @@ function trNext() {
 // ═══ Render ═══
 function render() {
   const app = document.getElementById('app');
-  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v3.5</span></p></div>';
+  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v3.7</span></p></div>';
 
   if (S.view==='home') {
     const g2n=S.data.g2?.length||0, g1n=(S.data.g1?.common?.length||0)+(S.data.g1?.selection?.length||0);
@@ -393,6 +393,7 @@ function render() {
     h += '<div class="card ct" onclick="go(\'textbook\')"><h2>教材</h2><p>テキスト＆分析</p><div class="cnt">全8章</div></div>';
     h += '</div>';
     h += '<button class="sbtn" onclick="go(\'dash\')">📊 分析ダッシュボード</button>';
+    h += '<button class="sbtn" onclick="go(\'roppo\')">📜 条文辞典（六法）</button>';
     h += '<button class="sbtn" onclick="go(\'settings\')">⚙ 設定（APIキー）</button>';
 
   } else if (S.view==='settings') {
@@ -544,6 +545,48 @@ function render() {
     if (weakQs.length > 0) h += '<button class="btn bp" style="background:var(--ng)" onclick="start2(\'weak\')">弱点集中モード</button>';
     h += '</div>';
 
+  } else if (S.view==='roppo') {
+    h += '<div class="bc"><a onclick="goHome()">ホーム</a> › 条文辞典</div>';
+    h += '<div class="stitle">📜 条文辞典（六法）</div>';
+    h += '<div class="info">テキスト・問題で取り上げた主要条文を法律別に整理しています。</div>';
+    var lawKeys = Object.keys(S.laws);
+    var groups = {};
+    lawKeys.forEach(function(k) {
+      var lawName = k.replace(/\d+条.*$/, '').replace(/の\d+$/, '');
+      if (!groups[lawName]) groups[lawName] = [];
+      groups[lawName].push(k);
+    });
+    var order = ['民法','会社法','借地借家法','特許法','不競法','消費者契約法','労基法','労契法'];
+    var shown = {};
+    order.forEach(function(name) {
+      if (!groups[name]) return;
+      shown[name] = true;
+      h += '<div style="font-family:\'Noto Serif JP\',serif;font-size:17px;font-weight:700;margin:16px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--bl);color:var(--bl)">'+name+'</div>';
+      groups[name].sort(function(a,b) {
+        var na = parseInt(a.match(/(\d+)/)?.[1]||0);
+        var nb = parseInt(b.match(/(\d+)/)?.[1]||0);
+        return na - nb;
+      });
+      groups[name].forEach(function(k) {
+        var text = S.laws[k];
+        h += '<div style="background:#fff;border:1px solid var(--bg2);border-radius:var(--r);padding:12px;margin-bottom:6px">';
+        h += '<div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:4px">'+esc(k)+'</div>';
+        h += '<div style="font-size:14px;line-height:1.8;color:var(--ink2)">'+esc(text)+'</div>';
+        h += '</div>';
+      });
+    });
+    // その他の法律
+    Object.keys(groups).forEach(function(name) {
+      if (shown[name]) return;
+      h += '<div style="font-family:\'Noto Serif JP\',serif;font-size:17px;font-weight:700;margin:16px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--ink2);color:var(--ink2)">'+name+'</div>';
+      groups[name].forEach(function(k) {
+        h += '<div style="background:#fff;border:1px solid var(--bg2);border-radius:var(--r);padding:12px;margin-bottom:6px">';
+        h += '<div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:4px">'+esc(k)+'</div>';
+        h += '<div style="font-size:14px;line-height:1.8;color:var(--ink2)">'+esc(S.laws[k])+'</div></div>';
+      });
+    });
+    h += '<div style="margin-top:12px;font-size:14px;color:var(--ink2);text-align:center">全'+lawKeys.length+'条収録</div>';
+
   } else if (S.view==='textbook') {
     h += '<div class="bc"><a onclick="goHome()">ホーム</a> › テキスト</div>';
     h += '<div class="stitle">📖 学習テキスト</div>';
@@ -595,7 +638,30 @@ function render() {
         h += '<button onclick="event.stopPropagation();toggleTextRead(\''+key+'\')" style="flex-shrink:0;padding:5px 12px;border-radius:20px;border:1.5px solid '+(done?'var(--ok)':'var(--bg2)')+';background:'+(done?'var(--ok)':'#fff')+';color:'+(done?'#fff':'var(--ink2)')+';font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">'+(done?'✓ 済':'未学習')+'</button>';
         h += '</div>';
         // Content with **bold** rendering
-        var content = esc(sec.content).replace(/\*\*(.+?)\*\*/g, '<b style="color:var(--ink);background:#fef3cd;padding:1px 3px;border-radius:2px">$1</b>');
+        // Content rendering with **bold** and table support
+        var raw = esc(sec.content);
+        // Convert markdown tables to HTML
+        var lines = raw.split('\n');
+        var out = [], inTable = false, tableHTML = '';
+        for (var li = 0; li < lines.length; li++) {
+          var line = lines[li].trim();
+          if (line.match(/^\|.+\|$/)) {
+            if (!inTable) { inTable = true; tableHTML = '<div style="overflow-x:auto;margin:8px 0"><table style="width:100%;border-collapse:collapse;font-size:14px">'; }
+            if (line.match(/^\|[\s\-\|]+$/)) continue; // separator row
+            var cells = line.split('|').filter(function(c){return c.trim()!=='';});
+            var isHeader = li+1 < lines.length && lines[li+1].trim().match(/^\|[\s\-\|]+$/);
+            var tag = isHeader ? 'th' : 'td';
+            var style = isHeader ? 'background:var(--bg2);font-weight:700;' : '';
+            tableHTML += '<tr>';
+            cells.forEach(function(c){ tableHTML += '<'+tag+' style="border:1px solid #ddd;padding:6px 8px;'+style+'">'+c.trim()+'</'+tag+'>'; });
+            tableHTML += '</tr>';
+          } else {
+            if (inTable) { tableHTML += '</table></div>'; out.push(tableHTML); inTable = false; tableHTML = ''; }
+            out.push(line);
+          }
+        }
+        if (inTable) { tableHTML += '</table></div>'; out.push(tableHTML); }
+        var content = out.join('\n').replace(/\*\*(.+?)\*\*/g, '<b style="color:var(--ink);background:#fef3cd;padding:1px 3px;border-radius:2px">$1</b>');
         h += '<div style="font-size:17px;line-height:2.0;margin-bottom:12px">'+content+'</div>';
         // Key points
         if (sec.points && sec.points.length > 0) {
