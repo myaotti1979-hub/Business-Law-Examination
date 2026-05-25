@@ -1,4 +1,4 @@
-const CACHE_NAME = 'houmu-v39';
+const CACHE_NAME = 'houmu-v40';
 const ASSETS = [
   './',
   './index.html',
@@ -40,7 +40,8 @@ self.addEventListener('fetch', e => {
 
   // HTML + JSON: network-first (updates reflect immediately)
   const url = e.request.url;
-  if (url.endsWith('.html') || url.endsWith('.json') || url.endsWith('/')) {
+  const pathname = new URL(url).pathname;
+  if (pathname.endsWith('.html') || pathname.endsWith('.json') || pathname.endsWith('/')) {
     e.respondWith(
       fetch(e.request).then(res => {
         if (res && res.status === 200) {
