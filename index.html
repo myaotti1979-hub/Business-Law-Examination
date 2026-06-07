@@ -98,7 +98,7 @@ body.offline .offline-badge{display:block}
 <body>
 <div class="offline-badge">📴 オフラインモード</div>
 <div id="app" class="app">
-  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v4.5</span></p></div>
+  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v4.6</span></p></div>
   <div style="text-align:center;padding:40px;color:var(--ink2)">読み込み中...</div>
 </div>
 
@@ -196,7 +196,7 @@ const BASE = (function(){
   return p.substring(0, p.lastIndexOf('/') + 1);
 })();
 
-var APP_VER = 'v45';
+var APP_VER = 'v46';
 async function fetchJSON(path) {
   const url = BASE + path + '?v=' + APP_VER;
   const r = await fetch(url);
@@ -374,7 +374,7 @@ function trNext() {
 // ═══ Render ═══
 function render() {
   const app = document.getElementById('app');
-  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v4.5</span></p></div>';
+  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v4.6</span></p></div>';
 
   if (S.view==='home') {
     const g2n=S.data.g2?.length||0, g1n=(S.data.g1?.common?.length||0)+(S.data.g1?.selection?.length||0);
@@ -557,7 +557,7 @@ function render() {
   } else if (S.view==='roppo') {
     h += '<div class="bc"><a onclick="goHome()">ホーム</a> › 条文辞典</div>';
     h += '<div class="stitle">📜 条文辞典（六法）</div>';
-    h += '<div class="info">法律名をタップで条文を表示。全'+Object.keys(S.laws).length+'条収録。</div>';
+    h += '<div class="info">法律名をタップ→中区分をタップで条文表示。全'+Object.keys(S.laws).length+'条収録。</div>';
     var lawKeys = Object.keys(S.laws);
     var groups = {};
     lawKeys.forEach(function(k) {
@@ -565,44 +565,75 @@ function render() {
       if (!groups[lawName]) groups[lawName] = [];
       groups[lawName].push(k);
     });
+    // 中区分の定義
+    var subGroups = {
+      '民法': [
+        {name:'総則（信義則・意思表示・代理）', min:1, max:174},
+        {name:'物権（対抗要件・担保物権）', min:175, max:398},
+        {name:'債権総論（債務不履行・保証・時効）', min:399, max:520},
+        {name:'契約（売買・賃貸借・請負・委任）', min:521, max:696},
+        {name:'不法行為', min:697, max:999},
+      ],
+      '会社法': [
+        {name:'総則・設立・株式', min:1, max:294},
+        {name:'機関（株主総会・取締役・監査役）', min:295, max:430},
+        {name:'事業譲渡・組織再編・訴訟', min:431, max:999},
+      ]
+    };
     var order = ['民法','会社法','商法','借地借家法','特許法','不競法','消費者契約法','製造物責任法','労基法','労契法'];
     var colors = {'民法':'#1a5276','会社法':'#7d3c98','商法':'#117a65','借地借家法':'#b9770e','特許法':'#1f618d','不競法':'#a93226','消費者契約法':'#d68910','製造物責任法':'#6c3483','労基法':'#196f3d','労契法':'#2471a3'};
     if (!S.roppoOpen) S.roppoOpen = null;
+    if (!S.roppoSub) S.roppoSub = null;
     var shown = {};
+
+    function renderLawItems(keys, color) {
+      keys.sort(function(a,b) {
+        var na = parseInt(a.match(/(\d+)/)?.[1]||0);
+        var nb = parseInt(b.match(/(\d+)/)?.[1]||0);
+        return na - nb;
+      });
+      keys.forEach(function(k) {
+        h += '<div style="background:#fff;border-left:3px solid '+color+';padding:10px 12px;margin:0 0 4px 16px">';
+        h += '<div style="font-size:15px;font-weight:700;color:'+color+';margin-bottom:4px">'+esc(k)+'</div>';
+        h += '<div style="font-size:14px;line-height:1.8;color:var(--ink2)">'+esc(S.laws[k])+'</div></div>';
+      });
+    }
+
     order.forEach(function(name) {
       if (!groups[name]) return;
       shown[name] = true;
       var isOpen = S.roppoOpen === name;
       var color = colors[name] || 'var(--ink)';
       var count = groups[name].length;
-      h += '<div onclick="S.roppoOpen=S.roppoOpen===\''+name+'\'?null:\''+name+'\';render();" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;margin-bottom:4px;background:'+(isOpen?color:'#fff')+';color:'+(isOpen?'#fff':color)+';border:2px solid '+color+';border-radius:var(--r);font-size:17px;font-weight:700">';
+      h += '<div onclick="S.roppoOpen=S.roppoOpen===\''+name+'\'?null:\''+name+'\';S.roppoSub=null;render();" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;margin-bottom:4px;background:'+(isOpen?color:'#fff')+';color:'+(isOpen?'#fff':color)+';border:2px solid '+color+';border-radius:var(--r);font-size:17px;font-weight:700">';
       h += '<span>'+name+'</span><span style="font-size:14px;font-weight:400">'+count+'条 '+(isOpen?'▲':'▼')+'</span></div>';
-      if (isOpen) {
-        groups[name].sort(function(a,b) {
-          var na = parseInt(a.match(/(\d+)/)?.[1]||0);
-          var nb = parseInt(b.match(/(\d+)/)?.[1]||0);
-          return na - nb;
+      if (isOpen && subGroups[name]) {
+        // 中区分ありの法律
+        subGroups[name].forEach(function(sg, si) {
+          var subKeys = groups[name].filter(function(k) {
+            var n = parseInt(k.match(/(\d+)/)?.[1]||0);
+            return n >= sg.min && n <= sg.max;
+          });
+          if (subKeys.length === 0) return;
+          var subId = name+'-'+si;
+          var subOpen = S.roppoSub === subId;
+          h += '<div onclick="event.stopPropagation();S.roppoSub=S.roppoSub===\''+subId+'\'?null:\''+subId+'\';render();" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;margin:0 0 3px 8px;background:'+(subOpen?'#f0f0f0':'#fafafa')+';border-left:4px solid '+color+';border-radius:0 var(--r) var(--r) 0;font-size:15px;font-weight:600;color:'+color+'">';
+          h += '<span>'+sg.name+'</span><span style="font-size:13px;font-weight:400;color:var(--ink2)">'+subKeys.length+'条 '+(subOpen?'▲':'▼')+'</span></div>';
+          if (subOpen) { renderLawItems(subKeys, color); }
         });
-        groups[name].forEach(function(k) {
-          h += '<div style="background:#fff;border-left:3px solid '+color+';padding:10px 12px;margin:0 0 4px 12px">';
-          h += '<div style="font-size:15px;font-weight:700;color:'+color+';margin-bottom:4px">'+esc(k)+'</div>';
-          h += '<div style="font-size:14px;line-height:1.8;color:var(--ink2)">'+esc(S.laws[k])+'</div></div>';
-        });
+      } else if (isOpen) {
+        // 中区分なしの法律（そのまま展開）
+        renderLawItems(groups[name], color);
       }
     });
     Object.keys(groups).forEach(function(name) {
       if (shown[name]) return;
       var isOpen = S.roppoOpen === name;
+      var color = 'var(--ink)';
       var count = groups[name].length;
-      h += '<div onclick="S.roppoOpen=S.roppoOpen===\''+name+'\'?null:\''+name+'\';render();" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;margin-bottom:4px;background:'+(isOpen?'var(--ink)':'#fff')+';color:'+(isOpen?'#fff':'var(--ink)')+';border:2px solid var(--ink);border-radius:var(--r);font-size:17px;font-weight:700">';
+      h += '<div onclick="S.roppoOpen=S.roppoOpen===\''+name+'\'?null:\''+name+'\';render();" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;margin-bottom:4px;background:'+(isOpen?'#333':'#fff')+';color:'+(isOpen?'#fff':'#333')+';border:2px solid #333;border-radius:var(--r);font-size:17px;font-weight:700">';
       h += '<span>'+name+'</span><span style="font-size:14px;font-weight:400">'+count+'条 '+(isOpen?'▲':'▼')+'</span></div>';
-      if (isOpen) {
-        groups[name].forEach(function(k) {
-          h += '<div style="background:#fff;border-left:3px solid var(--ink);padding:10px 12px;margin:0 0 4px 12px">';
-          h += '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+esc(k)+'</div>';
-          h += '<div style="font-size:14px;line-height:1.8;color:var(--ink2)">'+esc(S.laws[k])+'</div></div>';
-        });
-      }
+      if (isOpen) { renderLawItems(groups[name], '#333'); }
     });
 
   } else if (S.view==='textbook') {
