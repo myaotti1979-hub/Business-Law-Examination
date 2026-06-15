@@ -98,7 +98,7 @@ body.offline .offline-badge{display:block}
 <body>
 <div class="offline-badge">📴 オフラインモード</div>
 <div id="app" class="app">
-  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v5.4</span></p></div>
+  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v5.5</span></p></div>
   <div style="text-align:center;padding:40px;color:var(--ink2)">読み込み中...</div>
 </div>
 
@@ -196,7 +196,7 @@ const BASE = (function(){
   return p.substring(0, p.lastIndexOf('/') + 1);
 })();
 
-var APP_VER = 'v54';
+var APP_VER = 'v55';
 async function fetchJSON(path) {
   const url = BASE + path + '?v=' + APP_VER;
   const r = await fetch(url);
@@ -240,6 +240,10 @@ function lawRefHTML(refs) {
   const id = 'law' + Math.random().toString(36).slice(2,8);
   return '<div class="lawref"><button class="lawbtn" onclick="document.getElementById(\''+id+'\').style.display=document.getElementById(\''+id+'\').style.display===\'none\'?\'block\':\'none\'">📜 参照条文 ('+items.length+'条)</button><div id="'+id+'" style="display:none" class="lawbox">'+items.map(l=>'<b>'+esc(l.key)+'</b><br>'+esc(l.text)).join('<br><br>')+'</div></div>';
 }
+function secLinkHTML(q) {
+  if (!q.sec) return '';
+  return '<button onclick="goToSection(\''+q.sec+'\')" style="margin-top:8px;padding:8px 14px;border-radius:var(--r);border:1.5px solid var(--bl);background:#fff;color:var(--bl);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;width:100%">📖 該当テキストを読む</button>';
+}
 
 // ═══ Timer ═══
 function startTimer() { S.elapsed=0; S.running=true; S.timerId=setInterval(()=>{S.elapsed++;renderTimer();},1000); }
@@ -249,6 +253,19 @@ function renderTimer() { const el=document.getElementById('timer'); if(el) el.te
 // ═══ Navigation ═══
 function go(view) { S.view=view; S._scrolled=false; render(); window.scrollTo(0,0); }
 function goHome() { stopTimer(); go('home'); }
+function goToSection(secId) {
+  // secId = "g2-1-0" → grade2 ch1 sec0
+  var parts = secId.split('-');
+  var grade = parts[0]==='g1' ? 1 : 2;
+  var ch = parseInt(parts[1]);
+  var si = parseInt(parts[2]);
+  stopTimer();
+  S.textGrade = grade;
+  S.textCh = ch;
+  S._scrollToSec = si;
+  go('textch');
+  setTimeout(function(){ var el=document.getElementById('sec-'+si); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 100);
+}
 
 // ═══ Gemini API ═══
 async function callGemini(scenario, subQs, essays, model, useProModel) {
@@ -374,7 +391,7 @@ function trNext() {
 // ═══ Render ═══
 function render() {
   const app = document.getElementById('app');
-  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v5.4</span></p></div>';
+  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v5.5</span></p></div>';
 
   if (S.view==='home') {
     const g2n=S.data.g2?.length||0, g1n=(S.data.g1?.common?.length||0)+(S.data.g1?.selection?.length||0);
@@ -495,7 +512,7 @@ function render() {
     }
     if(S.trDone&&q.t!=='short') {
       const ok=S.trHist[S.trHist.length-1]?.correct;
-      h += '<div class="exp '+(ok?'eok':'eng')+'"><div class="el">'+(ok?'⭕ 正解':'❌ 不正解')+'</div><div>'+esc(q.ex)+'</div>'+lawRefHTML(q.laws)+'</div>';
+      h += '<div class="exp '+(ok?'eok':'eng')+'"><div class="el">'+(ok?'⭕ 正解':'❌ 不正解')+'</div><div>'+esc(q.ex)+'</div>'+lawRefHTML(q.laws)+secLinkHTML(q)+'</div>';
     }
     h += '<div class="br">';
     if(!S.trDone) h += '<button class="btn bor" onclick="'+(q.t==='short'?'S.trAns=document.getElementById(\'trans\').value;':'')+'trConfirm()" '+(q.t==='short'?'':(S.trSel.length===0?'disabled':''))+'>'+(q.t==='short'?'確認':'解答')+'</button>';
@@ -753,7 +770,7 @@ function render() {
       h += '<button class="'+cls+'" onclick="if(!S.answered){S.sel='+i+';render();}"><span class="mk">'+(q.t==='combo'?(i+1):'①②③④'[i])+'</span><span>'+esc(c)+'</span></button>';
     });
     h += '</div>';
-    if(S.answered){const ok=S.hist[S.hist.length-1]?.ok;h+='<div class="exp '+(ok?'eok':'eng')+'"><div class="el">'+(ok?'⭕ 正解':'❌ 不正解')+'</div><div>'+esc(q.ex)+'</div>'+lawRefHTML(q.laws)+'</div>';}
+    if(S.answered){const ok=S.hist[S.hist.length-1]?.ok;h+='<div class="exp '+(ok?'eok':'eng')+'"><div class="el">'+(ok?'⭕ 正解':'❌ 不正解')+'</div><div>'+esc(q.ex)+'</div>'+lawRefHTML(q.laws)+secLinkHTML(q)+'</div>';}
     h += '<div class="br">';
     if(!S.answered) {
       var btnLabel = S.quizMode==='mock' ? (S.ci+1>=S.qs.length?'解答して採点へ':'解答して次へ →') : '解答';
@@ -818,7 +835,7 @@ function render() {
     h += '<div class="rvl">';
     S.qs.forEach((q,i)=>{h+='<div class="rvi" onclick="S.revI=S.revI==='+i+'?null:'+i+';render();"><span class="rvd '+(S.hist[i]?.ok?'ok':'ng')+'"></span><span class="rvt">問'+(i+1)+' ['+q.a+'] '+esc(q.q.substring(0,30))+'…</span><span style="color:#999">'+(S.revI===i?'▲':'▼')+'</span></div>';});
     h += '</div>';
-    if(S.revI!==null){const q=S.qs[S.revI];h+='<div class="rvp"><div class="qt">'+esc(q.q)+'</div>';if(q.t==='combo'){h+='<div class="stmts">';q.s.forEach(s=>h+='<div class="stm">'+esc(s)+'</div>');h+='</div>';}h+='<div class="exp '+(S.hist[S.revI]?.ok?'eok':'eng')+'"><div class="el">'+(S.hist[S.revI]?.ok?'⭕':'❌')+'</div><div>'+esc(q.ex)+'</div>'+lawRefHTML(q.laws)+'</div></div>';}
+    if(S.revI!==null){const q=S.qs[S.revI];h+='<div class="rvp"><div class="qt">'+esc(q.q)+'</div>';if(q.t==='combo'){h+='<div class="stmts">';q.s.forEach(s=>h+='<div class="stm">'+esc(s)+'</div>');h+='</div>';}h+='<div class="exp '+(S.hist[S.revI]?.ok?'eok':'eng')+'"><div class="el">'+(S.hist[S.revI]?.ok?'⭕':'❌')+'</div><div>'+esc(q.ex)+'</div>'+lawRefHTML(q.laws)+secLinkHTML(q)+'</div></div>';}
     h += '<div class="ctr"><button class="btn bo" onclick="goHome()">ホーム</button><button class="btn bp" onclick="start2(S.qs.length>15?\'full\':\'practice\')">再挑戦</button></div>';
 
   } else if (S.view==='res1') {
