@@ -1,92 +1,56 @@
-# 法務検定 学習 — ビジネス実務法務検定試験® PWA
+# 法務検定 学習 v5.3
 
-オフライン対応のPWA学習アプリ。GitHub Pagesでホスティング可能。
+ビジネス実務法務検定試験® 2級・1級対策 PWA学習アプリ
 
-## デプロイ方法
+## コンテンツ
 
-### 1. GitHubリポジトリを作成
+| 項目 | 内容 |
+|------|------|
+| テキスト 2級 | 8章54セクション（quiz270問） |
+| テキスト 1級 | 7章23セクション（quiz115問） |
+| 演習問題 | 2級255問 / 1級10問 |
+| 模擬試験 | 3回分（各40問/90分/70点合格） |
+| トレーニング | 130問 |
+| 条文辞典 | 239条（22法令） |
+| **総問題数** | **890問** |
 
-```bash
-# zipを展開
-unzip houmu-pwa.zip
-cd pwa
+## 機能
 
-# Gitリポジトリ化
-git init
-git add .
-git commit -m "初回コミット"
-
-# GitHubにpush（リポジトリを事前に作成しておく）
-git remote add origin https://github.com/YOUR_USERNAME/houmu-pwa.git
-git branch -M main
-git push -u origin main
-```
-
-### 2. GitHub Pagesを有効化
-
-1. リポジトリの **Settings** → **Pages**
-2. Source: **Deploy from a branch**
-3. Branch: **main** / **(root)**
-4. **Save**
-
-数分後に `https://YOUR_USERNAME.github.io/houmu-pwa/` でアクセス可能になります。
-
-### 3. スマホにインストール (PWA)
-
-1. スマホのブラウザで上記URLにアクセス
-2. **「ホーム画面に追加」**（iOS: 共有ボタン → Android: メニュー →）
-3. アプリアイコンから起動可能に
-4. オフラインでも動作（初回アクセス後）
+- 📖 学習テキスト（セクション練習付き）
+- 📝 演習（15問ランダム / 全問 / 弱点集中）
+- 🎯 模擬試験（本試験完全準拠・一括採点方式）
+- 📊 分析ダッシュボード
+- 📜 条文辞典（2階層アコーディオン）
+- 🤖 AI添削（1級論述/Gemini API）
+- 📱 PWA対応（オフライン学習可能）
 
 ## ファイル構成
 
 ```
-pwa/
-├── index.html          ← メインアプリ（vanilla JS、フレームワーク不要）
+├── index.html          ← メインアプリ
+├── sw.js               ← Service Worker
 ├── manifest.json       ← PWAマニフェスト
-├── sw.js              ← Service Worker（オフライン対応）
-├── data/
-│   ├── laws.json      ← 条文辞典（30+条文の原文）
-│   ├── grade2.json    ← 2級 演習問題
-│   ├── grade1.json    ← 1級 演習問題
-│   └── training.json  ← パーツ練習問題（2級+1級）
-└── icons/
-    ├── icon-192.png
-    └── icon-512.png
+├── .nojekyll           ← GitHub Pages設定
+├── README.md
+├── icons/
+│   ├── icon-192.png
+│   └── icon-512.png
+└── data/
+    ├── grade2.json     ← 2級演習問題
+    ├── grade1.json     ← 1級演習問題
+    ├── mock.json       ← 模擬試験（3回分）
+    ├── textbook.json   ← 学習テキスト
+    ├── laws.json       ← 条文辞典
+    └── training.json   ← トレーニング
 ```
 
-## 問題の追加方法
+## デプロイ
 
-各JSONファイルを編集して問題を追加できます。
-
-### 2級問題の形式 (`data/grade2.json`)
-
-```json
-{
-  "id": 99,
-  "a": "企業取引",           // 分野名
-  "t": "combo",              // combo=組み合わせ, scenario=事例, single=単答
-  "q": "問題文...",
-  "s": ["ア　...","イ　...","ウ　...","エ　...","オ　..."],  // comboの場合
-  "c": ["ア・イ","ア・ウ","イ・エ","ウ・オ","エ・オ"],        // comboの選択肢
-  "ch": ["選択肢①","選択肢②","選択肢③","選択肢④"],          // single/scenarioの場合
-  "ans": 1,                  // 正解のインデックス(0始まり)
-  "ex": "解説テキスト...",
-  "laws": ["民法555条","民法557条"]  // 参照条文キー(laws.jsonのキー)
-}
-```
-
-### Gemini API
-
-1級のAI添削には Google Gemini API キーが必要です。
-アプリ内の「設定」から登録してください（localStorageに保存）。
-
-[Google AI Studio](https://aistudio.google.com/apikey) で無料取得可能。
+GitHub Pagesで公開。リポジトリのSettings → Pages → Source: main branchで有効化。
 
 ## 技術仕様
 
-- **フレームワーク不要**: Vanilla JS（CDN依存なし）
-- **オフライン対応**: Service Worker + Cache API
-- **データ永続化**: localStorage（APIキー等）
-- **AI添削**: Gemini 2.0 Flash API
-- **PWA対応**: manifest.json + Service Worker
+- Vanilla JS（フレームワーク不使用）
+- Service Worker: HTML/JSONはネットワーク優先、その他はキャッシュ優先
+- JSONにAPP_VERベースのキャッシュバスター付与
+- Gemini API: デュアルAPIキー（無料枠/Pro枠）
