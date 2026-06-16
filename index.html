@@ -478,7 +478,7 @@ function render() {
     if (weakCount > 0) h += '<button class="cb" style="border-color:var(--ng);color:var(--ng)" onclick="start2(\'weak\')"><span>🔥 弱点集中</span><span class="n">'+weakCount+'問</span></button>';
     // 模擬試験
     (S.data.mock||[]).forEach(function(m) {
-      h += '<button class="cb all" onclick="startMock('+m.id+')"><span>🎯 '+m.title+'（40問/90分/70点合格）</span><span class="n">本番想定</span></button>';
+      h += '<button class="cb all" onclick="startMock(\''+m.id+'\')"><span>🎯 '+m.title+'（40問/90分/70点合格）</span><span class="n">本番想定</span></button>';
     });
     h += '<button class="cb" style="border-color:var(--or)" onclick="go(\'dash\')"><span>📊 分析ダッシュボード</span><span class="n"></span></button>';
     h += '</div>';
