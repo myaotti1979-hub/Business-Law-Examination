@@ -196,7 +196,7 @@ const BASE = (function(){
   return p.substring(0, p.lastIndexOf('/') + 1);
 })();
 
-var APP_VER = 'v79';
+var APP_VER = 'v80';
 async function fetchJSON(path) {
   const url = BASE + path + '?v=' + APP_VER;
   const r = await fetch(url);
@@ -770,21 +770,21 @@ function render() {
     }
 
   } else if (S.view==='quiz2' && S.qs.length>0) {
-    const q=S.qs[S.ci], items=q.t==='combo'?q.c:q.ch;
+    const q=S.qs[S.ci], items=(q.t==='combo'||q.t==='marubatsu')?q.c:q.ch;
     if (S.quizMode==='mock') {
       h += '<div class="bc"><a onclick="goHome()">ホーム</a> › <span class="tg tg-b">'+(S.mockTitle||'模擬試験')+'</span> <span class="tmr" id="timer">⏱'+fmt(S.elapsed)+'</span></div>';
     } else {
       h += '<div class="bc"><a onclick="goHome()">ホーム</a> › <span class="tg tg-b">2級</span> <span class="tmr" id="timer">⏱'+fmt(S.elapsed)+'</span></div>';
     }
     h += '<div class="pbar"><div class="pfill pf2" style="width:'+((S.ci+(S.answered?1:0))/S.qs.length*100)+'%"></div></div>';
-    h += '<div class="qh"><span class="qn">第'+(S.ci+1)+'問/'+S.qs.length+' '+(q.t==='combo'?'<span class="tg tg-y">組み合わせ</span>':q.t==='scenario'?'<span class="tg tg-g">事例</span>':'<span class="tg tg-b">単答</span>')+'</span><span class="qs">正解'+S.score+' | '+q.a+'</span></div>';
+    h += '<div class="qh"><span class="qn">第'+(S.ci+1)+'問/'+S.qs.length+' '+(q.t==='combo'?'<span class="tg tg-y">組み合わせ</span>':q.t==='marubatsu'?'<span class="tg tg-y">○×</span>':q.t==='scenario'?'<span class="tg tg-g">事例</span>':'<span class="tg tg-b">単答</span>')+'</span><span class="qs">正解'+S.score+' | '+q.a+'</span></div>';
     h += '<div class="qt">'+esc(q.q)+'</div>';
-    if(q.t==='combo') { h += '<div class="stmts">'; q.s.forEach((s,i)=>h+='<div class="stm">'+esc(s)+'</div>'); h += '</div>'; }
+    if(q.t==='combo'||q.t==='marubatsu') { h += '<div class="stmts">'; q.s.forEach((s,i)=>h+='<div class="stm">'+esc(s)+'</div>'); h += '</div>'; }
     h += '<div class="chs">';
     items.forEach((c,i) => {
       let cls='ch';
       if(!S.answered){cls=S.sel===i?'ch sel':'ch';}else{if(i===q.ans)cls='ch ok lk';else if(i===S.sel)cls='ch ng lk';else cls='ch lk';}
-      h += '<button class="'+cls+'" onclick="if(!S.answered){S.sel='+i+';render();}"><span class="mk">'+(q.t==='combo'?(i+1):'①②③④'[i])+'</span><span>'+esc(c)+'</span></button>';
+      h += '<button class="'+cls+'" onclick="if(!S.answered){S.sel='+i+';render();}"><span class="mk">'+(q.t==='combo'||q.t==='marubatsu'?(i+1):'①②③④'[i])+'</span><span>'+esc(c)+'</span></button>';
     });
     h += '</div>';
     if(S.answered){const ok=S.hist[S.hist.length-1]?.ok;h+='<div class="exp '+(ok?'eok':'eng')+'"><div class="el">'+(ok?'⭕ 正解':'❌ 不正解')+'</div><div>'+esc(q.ex)+'</div>'+lawRefHTML(q.laws)+secLinkHTML(q)+'</div>';}
@@ -852,7 +852,7 @@ function render() {
     h += '<div class="rvl">';
     S.qs.forEach((q,i)=>{h+='<div class="rvi" onclick="S.revI=S.revI==='+i+'?null:'+i+';render();"><span class="rvd '+(S.hist[i]?.ok?'ok':'ng')+'"></span><span class="rvt">問'+(i+1)+' ['+q.a+'] '+esc(q.q.substring(0,30))+'…</span><span style="color:#999">'+(S.revI===i?'▲':'▼')+'</span></div>';});
     h += '</div>';
-    if(S.revI!==null){const q=S.qs[S.revI];h+='<div class="rvp"><div class="qt">'+esc(q.q)+'</div>';if(q.t==='combo'){h+='<div class="stmts">';q.s.forEach(s=>h+='<div class="stm">'+esc(s)+'</div>');h+='</div>';}h+='<div class="exp '+(S.hist[S.revI]?.ok?'eok':'eng')+'"><div class="el">'+(S.hist[S.revI]?.ok?'⭕':'❌')+'</div><div>'+esc(q.ex)+'</div>'+lawRefHTML(q.laws)+secLinkHTML(q)+'</div></div>';}
+    if(S.revI!==null){const q=S.qs[S.revI];h+='<div class="rvp"><div class="qt">'+esc(q.q)+'</div>';if(q.t==='combo'||q.t==='marubatsu'){h+='<div class="stmts">';q.s.forEach(s=>h+='<div class="stm">'+esc(s)+'</div>');h+='</div>';}h+='<div class="exp '+(S.hist[S.revI]?.ok?'eok':'eng')+'"><div class="el">'+(S.hist[S.revI]?.ok?'⭕':'❌')+'</div><div>'+esc(q.ex)+'</div>'+lawRefHTML(q.laws)+secLinkHTML(q)+'</div></div>';}
     h += '<div class="ctr"><button class="btn bo" onclick="goHome()">ホーム</button><button class="btn bp" onclick="start2(S.qs.length>15?\'full\':\'practice\')">再挑戦</button></div>';
 
   } else if (S.view==='res1') {
