@@ -196,7 +196,7 @@ const BASE = (function(){
   return p.substring(0, p.lastIndexOf('/') + 1);
 })();
 
-var APP_VER = 'v80';
+var APP_VER = 'v81';
 async function fetchJSON(path) {
   const url = BASE + path + '?v=' + APP_VER;
   const r = await fetch(url);
@@ -430,7 +430,7 @@ function render() {
     h += '<div class="cards">';
     h += '<div class="card c2" onclick="go(\'g2menu\')"><h2>2級</h2><p>演習＆練習</p><div class="cnt">'+g2n+'問</div></div>';
     h += '<div class="card c1" onclick="go(\'g1menu\')"><h2>1級</h2><p>演習＆練習</p><div class="cnt">'+g1n+'問</div></div>';
-    h += '<div class="card ct" onclick="go(\'textbook\')"><h2>教材</h2><p>テキスト＆分析</p><div class="cnt">全8章</div></div>';
+    h += '<div class="card ct" onclick="go(\'textbook\')"><h2>教材</h2><p>テキスト＆分析</p><div class="cnt">全16章</div></div>';
     h += '</div>';
     h += '<button class="sbtn" onclick="go(\'dash\')">📊 分析ダッシュボード</button>';
     h += '<button class="sbtn" onclick="go(\'roppo\')">📜 条文辞典（六法）</button>';
@@ -471,7 +471,7 @@ function render() {
     h += '<div class="stitle">2級 — 学習メニュー</div>';
     h += '<div class="advice"><h3>📚 学習の流れ</h3>①テキストで学習（セクション練習で確認）→ ②演習で実戦力 → ③模擬試験で合否判定</div>';
     h += '<div class="ml">';
-    h += '<button class="cb" style="border-color:var(--gd)" onclick="go(\'textbook\')"><span>📖 学習テキスト（セクション練習付き）</span><span class="n">全8章</span></button>';
+    h += '<button class="cb" style="border-color:var(--gd)" onclick="go(\'textbook\')"><span>📖 学習テキスト（セクション練習付き）</span><span class="n">全16章</span></button>';
     h += '<button class="cb" onclick="start2(\'practice\')"><span>📝 演習（15問ランダム）</span><span class="n">練習</span></button>';
     h += '<button class="cb" onclick="start2(\'all\')"><span>📝 演習（全'+((S.data.g2||[]).length)+'問）</span><span class="n">総復習</span></button>';
     var weakCount = getWeakQuestions([...(S.data.g2||[])]).filter(function(q){var r=S.progress.g2[q.id];return r&&r.wrong>r.correct;}).length;
