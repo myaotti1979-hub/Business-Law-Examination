@@ -229,23 +229,24 @@ async function fetchJSON(path) {
 
 async function loadData() {
   try {
-    const [laws, g2, g1, tr, textbook, mock] = await Promise.all([
-      fetchJSON('data/laws.json'),
-      fetchJSON('data/grade2.json'),
-      fetchJSON('data/grade1.json'),
-      fetchJSON('data/training.json'),
-      fetchJSON('data/textbook.json'),
-      fetchJSON('data/mock.json'),
-    ]);
+    async function tryJSON(path, fallback) {
+      try { return await fetchJSON(path); } catch(e) { return fallback; }
+    }
+    var laws = await tryJSON('data/laws.json', {});
+    var g2 = await tryJSON('data/grade2.json', []);
+    var g1 = await tryJSON('data/grade1.json', {common:[],selection:[]});
+    var tr = await tryJSON('data/training.json', {grade2:[],grade1:[]});
+    var textbook = await tryJSON('data/textbook.json', {grade2:[],grade1:[]});
+    var mock = await tryJSON('data/mock.json', []);
     S.laws = laws;
-    S.data = { g2, g1, tr, textbook, mock };
+    S.data = { g2:g2, g1:g1, tr:tr, textbook:textbook, mock:mock };
     try { S.apiKey = localStorage.getItem('gemini-key') || ''; } catch(e) {}
     try { S.apiKeyPro = localStorage.getItem('gemini-key-pro') || ''; } catch(e) {}
     try { S.geminiModel = localStorage.getItem('gemini-model') || 'gemini-3.1-flash-lite'; } catch(e) {}
     loadProgress();
     render();
   } catch(e) {
-    document.getElementById('app').innerHTML = '<div class="app"><div class="hdr"><h1>法務検定 学習</h1><p>v85</p></div><div style="margin:20px;padding:20px;background:#fee;border:2px solid red;border-radius:8px;color:#900;font-size:14px"><b>⚠ データ読み込みエラー</b><br><br>'+e.message+'<br><br>stack: '+(e.stack||'none').substring(0,300)+'</div></div>';
+    document.getElementById('app').innerHTML = '<div style="padding:20px"><h2 style="color:red">⚠ エラー</h2><p>'+e.message+'</p></div>';
   }
 }
 
@@ -427,7 +428,6 @@ function trNext() {
 function render() {
   const app = document.getElementById('app');
   let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v85</span></p></div>';
-  try {
 
   if (S.view==='home') {
     const g2n=S.data.g2?.length||0, g1n=(S.data.g1?.common?.length||0)+(S.data.g1?.selection?.length||0);
@@ -889,9 +889,6 @@ function render() {
     h += '<div class="ctr"><button class="btn bo" onclick="goHome()">ホーム</button></div>';
   }
 
-  } catch(renderErr) {
-    h += '<div style="margin:20px;padding:20px;background:#fee;border:2px solid red;border-radius:8px;color:#900;font-size:14px"><b>⚠ 表示エラー</b><br><br>view: '+S.view+'<br>error: '+renderErr.message+'<br><br>g2: '+(S.data.g2?S.data.g2.length:'null')+'<br>textbook: '+(S.data.textbook?'有':'null')+'<br>mock: '+(S.data.mock?S.data.mock.length:'null')+'<br>laws: '+(S.laws?Object.keys(S.laws).length:'null')+'</div>';
-  }
   app.innerHTML = h;
   // テキスト章表示時: 未学習の最初のセクションに自動スクロール
   if (S.view === 'textch' && !S._scrolled) {
@@ -913,22 +910,9 @@ function render() {
 }
 
 // ═══ PWA & Offline ═══
-// SW登録を一時無効化
-if (false && 'serviceWorker' in navigator) {
-  // 古いキャッシュを強制クリア
-  if (caches) {
-    caches.keys().then(function(keys) {
-      keys.forEach(function(k) {
-        if (k !== 'houmu-v85') caches.delete(k);
-      });
-    });
-  }
-  navigator.serviceWorker.getRegistrations().then(function(regs) {
-    regs.forEach(function(r) { r.unregister(); });
-    setTimeout(function() {
-      navigator.serviceWorker.register('sw.js').catch(function(e) { console.log('SW error:', e); });
-    }, 500);
-  });
+// SW無効化
+if (false) {
+
 }
 window.addEventListener('online', () => { document.body.classList.remove('offline'); });
 window.addEventListener('offline', () => { document.body.classList.add('offline'); });
