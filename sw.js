@@ -1,4 +1,4 @@
-const CACHE_NAME = 'houmu-v84';
+const CACHE_NAME = 'houmu-v85';
 const ASSETS = [
   './',
   './index.html',
