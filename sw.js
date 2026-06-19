@@ -1,4 +1,4 @@
-// v85 自爆型SW - 全キャッシュ消去してネットワーク直接アクセスに切替
+// v86 自爆型SW - 全キャッシュ消去してネットワーク直接アクセスに切替
 self.addEventListener('install', function(e) {
   self.skipWaiting();
   e.waitUntil(
