@@ -98,7 +98,7 @@ body.offline .offline-badge{display:block}
 <body>
 <div class="offline-badge">📴 オフラインモード</div>
 <div id="app" class="app">
-  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v90</span></p></div>
+  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v92</span></p></div>
   <div style="text-align:center;padding:40px;color:var(--ink2)">読み込み中...</div>
 </div>
 
@@ -196,7 +196,7 @@ const BASE = (function(){
   return p.substring(0, p.lastIndexOf('/') + 1);
 })();
 
-var APP_VER = 'v90';
+var APP_VER = 'v92';
 async function fetchJSON(path) {
   const url = BASE + path + '?v=' + APP_VER;
   const r = await fetch(url);
@@ -317,20 +317,21 @@ function startMock(mockId) {
   var exam = (S.data.mock||[]).find(function(m){ return m.id === mockId; });
   if (!exam) return;
   var pool = [...exam.questions];
-  Object.assign(S, {qs:pool,ci:0,sel:null,answered:false,score:0,hist:[],revI:null,quizMode:'mock',mockTitle:exam.title});
+  Object.assign(S, {qs:pool,ci:0,sel:null,msel:null,answered:false,score:0,hist:[],revI:null,quizMode:'mock',mockTitle:exam.title});
   startTimer(); go('quiz2');
 }
 
+function multiToggle(i){if(S.answered)return;if(!S.msel)S.msel=[];const idx=S.msel.indexOf(i);if(idx>=0)S.msel.splice(idx,1);else S.msel.push(i);render();}
 function confirm2() {
-  if (S.sel===null) return;
-  const ok = S.sel===S.qs[S.ci].ans;
-  if (ok) S.score++;
-  S.hist.push({sel:S.sel,ok});
+  const q=S.qs[S.ci];
+  if(q.t==='multi'){if(!S.msel||S.msel.length<1)return;const sa=S.msel.slice().sort();const aa=q.ans.slice().sort();const ok=sa.length===aa.length&&sa.every((v,i)=>v===aa[i]);if(ok)S.score++;S.hist.push({sel:[...S.msel],ok});}
+  else{if(S.sel===null)return;const ok=S.sel===q.ans;if(ok)S.score++;S.hist.push({sel:S.sel,ok});}
+  const ok=S.hist[S.hist.length-1].ok;
   if(S.qs[S.ci].id) recordResult(S.qs[S.ci].id, ok, S.qs[S.ci].a);
   if (S.quizMode==='mock') {
     // 模試モード: 解説を表示せず次の問題へ自動進行
     if (S.ci+1>=S.qs.length) { stopTimer(); go('res2'); }
-    else { S.ci++; S.sel=null; render(); window.scrollTo(0,0); }
+    else { S.ci++; S.sel=null; S.msel=null; render(); window.scrollTo(0,0); }
   } else {
     S.answered=true; render();
   }
@@ -338,7 +339,7 @@ function confirm2() {
 
 function next2() {
   if (S.ci+1>=S.qs.length) { stopTimer(); go('res2'); }
-  else { S.ci++; S.sel=null; S.answered=false; render(); window.scrollTo(0,0); }
+  else { S.ci++; S.sel=null; S.msel=null; S.answered=false; render(); window.scrollTo(0,0); }
 }
 
 // セクション練習: textbook.jsonに埋め込まれた専用問題を出題
@@ -406,7 +407,7 @@ function trNext() {
 // ═══ Render ═══
 function render() {
   const app = document.getElementById('app');
-  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v90</span></p></div>';
+  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v92</span></p></div>';
 
   if (S.view==='home') {
     const g2n=S.data.g2?.length||0, g1n=(S.data.g1?.common?.length||0)+(S.data.g1?.selection?.length||0);
@@ -773,28 +774,41 @@ function render() {
     }
 
   } else if (S.view==='quiz2' && S.qs.length>0) {
-    const q=S.qs[S.ci], items=(q.t==='combo'||q.t==='marubatsu')?q.c:q.ch;
+    const q=S.qs[S.ci], items=(q.t==='combo'||q.t==='marubatsu')?q.c:(q.t==='multi'?q.ch:q.ch);
+    const MK='①②③④⑤⑥⑦⑧';
     if (S.quizMode==='mock') {
       h += '<div class="bc"><a onclick="goHome()">ホーム</a> › <span class="tg tg-b">'+(S.mockTitle||'模擬試験')+'</span> <span class="tmr" id="timer">⏱'+fmt(S.elapsed)+'</span></div>';
     } else {
       h += '<div class="bc"><a onclick="goHome()">ホーム</a> › <span class="tg tg-b">2級</span> <span class="tmr" id="timer">⏱'+fmt(S.elapsed)+'</span></div>';
     }
     h += '<div class="pbar"><div class="pfill pf2" style="width:'+((S.ci+(S.answered?1:0))/S.qs.length*100)+'%"></div></div>';
-    h += '<div class="qh"><span class="qn">第'+(S.ci+1)+'問/'+S.qs.length+' '+(q.t==='combo'?'<span class="tg tg-y">組み合わせ</span>':q.t==='marubatsu'?'<span class="tg tg-y">○×</span>':q.t==='scenario'?'<span class="tg tg-g">事例</span>':'<span class="tg tg-b">単答</span>')+'</span><span class="qs">正解'+S.score+' | '+q.a+'</span></div>';
+    const tLabel=q.t==='combo'?'<span class="tg tg-y">組み合わせ</span>':q.t==='marubatsu'?'<span class="tg tg-y">○×</span>':q.t==='scenario'?'<span class="tg tg-g">事例</span>':q.t==='multi'?'<span class="tg tg-g">複数選択</span>':'<span class="tg tg-b">単答</span>';
+    h += '<div class="qh"><span class="qn">第'+(S.ci+1)+'問/'+S.qs.length+' '+tLabel+'</span><span class="qs">正解'+S.score+' | '+q.a+'</span></div>';
     h += '<div class="qt">'+esc(q.q)+'</div>';
-    if(q.t==='combo'||q.t==='marubatsu') { h += '<div class="stmts">'; q.s.forEach((s,i)=>h+='<div class="stm">'+esc(s)+'</div>'); h += '</div>'; }
+    if(q.t==='combo'||q.t==='marubatsu'||q.t==='multi') { if(q.s){h += '<div class="stmts">'; q.s.forEach((s,i)=>h+='<div class="stm">'+esc(s)+'</div>'); h += '</div>';} }
     h += '<div class="chs">';
-    items.forEach((c,i) => {
-      let cls='ch';
-      if(!S.answered){cls=S.sel===i?'ch sel':'ch';}else{if(i===q.ans)cls='ch ok lk';else if(i===S.sel)cls='ch ng lk';else cls='ch lk';}
-      h += '<button class="'+cls+'" onclick="if(!S.answered){S.sel='+i+';render();}"><span class="mk">'+(q.t==='combo'||q.t==='marubatsu'?(i+1):'①②③④'[i])+'</span><span>'+esc(c)+'</span></button>';
-    });
+    if(q.t==='multi'){
+      const msel=S.msel||[];
+      items.forEach((c,i) => {
+        let cls='ch';
+        if(!S.answered){cls=msel.includes(i)?'ch sel':'ch';}
+        else{const aa=q.ans||[];if(aa.includes(i))cls='ch ok lk';else if(msel.includes(i))cls='ch ng lk';else cls='ch lk';}
+        h += '<button class="'+cls+'" onclick="multiToggle('+i+')"><span class="mk">'+(msel.includes(i)?'✓':MK[i]||'')+'</span><span>'+esc(c)+'</span></button>';
+      });
+    } else {
+      items.forEach((c,i) => {
+        let cls='ch';
+        if(!S.answered){cls=S.sel===i?'ch sel':'ch';}else{if(i===q.ans)cls='ch ok lk';else if(i===S.sel)cls='ch ng lk';else cls='ch lk';}
+        h += '<button class="'+cls+'" onclick="if(!S.answered){S.sel='+i+';render();}"><span class="mk">'+(q.t==='combo'||q.t==='marubatsu'?(i+1):MK[i]||'')+'</span><span>'+esc(c)+'</span></button>';
+      });
+    }
     h += '</div>';
     if(S.answered){const ok=S.hist[S.hist.length-1]?.ok;h+='<div class="exp '+(ok?'eok':'eng')+'"><div class="el">'+(ok?'⭕ 正解':'❌ 不正解')+'</div><div>'+esc(q.ex)+'</div>'+lawRefHTML(q.laws)+secLinkHTML(q)+'</div>';}
     h += '<div class="br">';
     if(!S.answered) {
       var btnLabel = S.quizMode==='mock' ? (S.ci+1>=S.qs.length?'解答して採点へ':'解答して次へ →') : '解答';
-      h += '<button class="btn bp" onclick="confirm2()" '+(S.sel===null?'disabled':'')+'>'+btnLabel+'</button>';
+      const canConfirm=q.t==='multi'?(S.msel&&S.msel.length>0):S.sel!==null;
+      h += '<button class="btn bp" onclick="confirm2()" '+(canConfirm?'':'disabled')+'>'+btnLabel+'</button>';
     }
     else h += '<button class="btn bp" onclick="next2()">'+(S.ci+1>=S.qs.length?'結果を見る':'次の問題へ →')+'</button>';
     h += '</div>';
@@ -855,7 +869,7 @@ function render() {
     h += '<div class="rvl">';
     S.qs.forEach((q,i)=>{h+='<div class="rvi" onclick="S.revI=S.revI==='+i+'?null:'+i+';render();"><span class="rvd '+(S.hist[i]?.ok?'ok':'ng')+'"></span><span class="rvt">問'+(i+1)+' ['+q.a+'] '+esc(q.q.substring(0,30))+'…</span><span style="color:#999">'+(S.revI===i?'▲':'▼')+'</span></div>';});
     h += '</div>';
-    if(S.revI!==null){const q=S.qs[S.revI];h+='<div class="rvp"><div class="qt">'+esc(q.q)+'</div>';if(q.t==='combo'||q.t==='marubatsu'){h+='<div class="stmts">';q.s.forEach(s=>h+='<div class="stm">'+esc(s)+'</div>');h+='</div>';}h+='<div class="exp '+(S.hist[S.revI]?.ok?'eok':'eng')+'"><div class="el">'+(S.hist[S.revI]?.ok?'⭕':'❌')+'</div><div>'+esc(q.ex)+'</div>'+lawRefHTML(q.laws)+secLinkHTML(q)+'</div></div>';}
+    if(S.revI!==null){const q=S.qs[S.revI];h+='<div class="rvp"><div class="qt">'+esc(q.q)+'</div>';if(q.t==='combo'||q.t==='marubatsu'||q.t==='multi'){if(q.s){h+='<div class="stmts">';q.s.forEach(s=>h+='<div class="stm">'+esc(s)+'</div>');h+='</div>';}}h+='<div class="exp '+(S.hist[S.revI]?.ok?'eok':'eng')+'"><div class="el">'+(S.hist[S.revI]?.ok?'⭕':'❌')+'</div><div>'+esc(q.ex)+'</div>'+lawRefHTML(q.laws)+secLinkHTML(q)+'</div></div>';}
     h += '<div class="ctr"><button class="btn bo" onclick="goHome()">ホーム</button><button class="btn bp" onclick="start2(S.qs.length>15?\'full\':\'practice\')">再挑戦</button></div>';
 
   } else if (S.view==='res1') {
