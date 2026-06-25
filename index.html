@@ -98,7 +98,7 @@ body.offline .offline-badge{display:block}
 <body>
 <div class="offline-badge">📴 オフラインモード</div>
 <div id="app" class="app">
-  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v94</span></p></div>
+  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v95</span></p></div>
   <div style="text-align:center;padding:40px;color:var(--ink2)">読み込み中...</div>
 </div>
 
@@ -196,7 +196,7 @@ const BASE = (function(){
   return p.substring(0, p.lastIndexOf('/') + 1);
 })();
 
-var APP_VER = 'v94';
+var APP_VER = 'v95';
 async function fetchJSON(path) {
   const url = BASE + path + '?v=' + APP_VER;
   const r = await fetch(url);
@@ -406,7 +406,7 @@ function trNext() {
 // ═══ Render ═══
 function render() {
   const app = document.getElementById('app');
-  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v94</span></p></div>';
+  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v95</span></p></div>';
 
   if (S.view==='home') {
     const g2n=S.data.g2?.length||0, g1n=(S.data.g1?.common?.length||0)+(S.data.g1?.selection?.length||0);
