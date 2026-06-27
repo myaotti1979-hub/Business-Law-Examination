@@ -98,7 +98,7 @@ body.offline .offline-badge{display:block}
 <body>
 <div class="offline-badge">📴 オフラインモード</div>
 <div id="app" class="app">
-  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v104</span></p></div>
+  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v105</span></p></div>
   <div style="text-align:center;padding:40px;color:var(--ink2)">読み込み中...</div>
 </div>
 
@@ -196,7 +196,7 @@ const BASE = (function(){
   return p.substring(0, p.lastIndexOf('/') + 1);
 })();
 
-var APP_VER = 'v104';
+var APP_VER = 'v105';
 async function fetchJSON(path) {
   const url = BASE + path + '?v=' + APP_VER;
   const r = await fetch(url);
@@ -234,12 +234,42 @@ function shuffle(a) { const b=[...a]; for(let i=b.length-1;i>0;i--){const j=Math
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>'); }
 function fmt(s) { return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 
+var LAW_NAME_ALIAS = {
+  '下請代金支払遅延等防止法':'下請法','ウィーン売買条約':'CISG',
+  '裁判外紛争解決手続の利用の促進に関する法律':'ADR促進法',
+  '電子消費者契約に関する民法の特例に関する法律':'電子消費者契約法',
+  '電子消費者契約及び電子承諾通知に関する民法の特例に関する法律':'電子消費者契約法',
+  '行政手続における特定の個人を識別するための番号の利用等に関する法律':'マイナンバー法',
+  '建物の区分所有等に関する法律':'区分所有法',
+  '短時間労働者及び有期雇用労働者の雇用管理の改善等に関する法律':'パートタイム・有期雇用労働法',
+  '国際商業会議所信用状統一規則':'UCP600','医薬品医療機器等法':'薬機法',
+  '特定電子メールの送信の適正化等に関する法律':'特定電子メール法',
+  '電子署名及び認証業務に関する法律':'電子署名法',
+  '電子計算機を使用して作成する国税関係帳簿書類の保存方法等の特例に関する法律':'電子帳簿保存法',
+  '犯罪による収益の移転防止に関する法律':'犯罪収益移転防止法',
+  '廃棄物の処理及び清掃に関する法律':'廃棄物処理法',
+  '外国仲裁判断の承認及び執行に関する条約':'ニューヨーク条約',
+  '動産及び債権の譲渡の対抗要件に関する民法の特例等に関する法律':'動産債権譲渡特例法'
+};
+function normalizeLawKey(k) {
+  if (!k) return k;
+  var m = k.match(/^(.+?)(\d.*)$/);
+  if (!m) return LAW_NAME_ALIAS[k] || k;
+  var name = m[1], rest = m[2];
+  return (LAW_NAME_ALIAS[name] || name) + rest;
+}
+function lawText(k) {
+  if (S.laws[k]) return S.laws[k];
+  var nk = normalizeLawKey(k);
+  if (nk !== k && S.laws[nk]) return S.laws[nk];
+  return '';
+}
 function lawRefHTML(refs) {
   if (!refs || refs.length === 0) return '';
-  const items = refs.map(r => ({ key: r, text: S.laws[r] })).filter(l => l.text);
+  const items = refs.map(r => ({ key: r, text: lawText(r) }));
   if (items.length === 0) return '';
   const id = 'law' + Math.random().toString(36).slice(2,8);
-  return '<div class="lawref"><button class="lawbtn" onclick="document.getElementById(\''+id+'\').style.display=document.getElementById(\''+id+'\').style.display===\'none\'?\'block\':\'none\'">📜 参照条文 ('+items.length+'条)</button><div id="'+id+'" style="display:none" class="lawbox">'+items.map(l=>'<b>'+esc(l.key)+'</b><br>'+esc(l.text)).join('<br><br>')+'</div></div>';
+  return '<div class="lawref"><button class="lawbtn" onclick="document.getElementById(\''+id+'\').style.display=document.getElementById(\''+id+'\').style.display===\'none\'?\'block\':\'none\'">📜 参照条文 ('+items.length+'件)</button><div id="'+id+'" style="display:none" class="lawbox">'+items.map(l=>'<b>'+esc(l.key)+'</b>'+(l.text?'<br>'+esc(l.text):'')).join('<br><br>')+'</div></div>';
 }
 function secLinkHTML(q) {
   if (!q.sec) return '';
@@ -406,7 +436,7 @@ function trNext() {
 // ═══ Render ═══
 function render() {
   const app = document.getElementById('app');
-  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v104</span></p></div>';
+  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v105</span></p></div>';
 
   if (S.view==='home') {
     const g2n=S.data.g2?.length||0, g1n=(S.data.g1?.common?.length||0)+(S.data.g1?.selection?.length||0);
