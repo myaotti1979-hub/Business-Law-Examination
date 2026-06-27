@@ -98,7 +98,7 @@ body.offline .offline-badge{display:block}
 <body>
 <div class="offline-badge">📴 オフラインモード</div>
 <div id="app" class="app">
-  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v105</span></p></div>
+  <div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v108</span></p></div>
   <div style="text-align:center;padding:40px;color:var(--ink2)">読み込み中...</div>
 </div>
 
@@ -196,7 +196,7 @@ const BASE = (function(){
   return p.substring(0, p.lastIndexOf('/') + 1);
 })();
 
-var APP_VER = 'v105';
+var APP_VER = 'v108';
 async function fetchJSON(path) {
   const url = BASE + path + '?v=' + APP_VER;
   const r = await fetch(url);
@@ -313,18 +313,71 @@ function returnFromText() {
 }
 
 // ═══ Gemini API ═══
+// 小問の配点(末尾の「(20点)」等)を抽出。無ければ均等割りで50点に補正
+function subQMaxes(subQs) {
+  var ms = subQs.map(function(s){ var m=String(s).match(/\((\d+)\s*点\)/); return m?parseInt(m[1]):null; });
+  if (ms.every(function(x){return x!=null;})) return ms;
+  var n=subQs.length||1, base=Math.floor(50/n), arr=[]; for(var i=0;i<n;i++)arr.push(base);
+  arr[0]+=50-base*n; return arr;
+}
 async function callGemini(scenario, subQs, essays, model, useProModel) {
   var modelId = useProModel ? 'gemini-3.1-pro-preview' : S.geminiModel;
   var key = useProModel && S.apiKeyPro ? S.apiKeyPro : S.apiKey;
-  const prompt = "あなたはビジネス実務法務検定1級の採点官です。JSON形式のみで出力。{\"totalScore\":<0-50>,\"breakdown\":{\"legalBasis\":<0-15>,\"application\":<0-15>,\"logic\":<0-10>,\"conclusion\":<0-10>},\"subEvals\":[{\"subQ\":<番号>,\"score\":<点>,\"strengths\":\"良い点\",\"weaknesses\":\"改善点\",\"missingPoints\":\"漏れ論点\"}],\"overallComment\":\"総合講評\",\"passLevel\":\"<A|B|C|D>\"}\n\n【事例】\n"+scenario+"\n\n【設問と解答】\n"+subQs.map((sq,i)=>sq+"\n"+(essays[i]||"（未回答）")).join("\n\n")+"\n\n【模範解答】\n"+model+"\n\nJSON:";
+  var maxes = subQMaxes(subQs);
+  var qa = subQs.map(function(sq,i){
+    return "──小問"+(i+1)+"（配点"+maxes[i]+"点）──\n【設問】"+sq+"\n【受験者の答案】\n"+(essays[i]&&essays[i].trim()?essays[i]:"（未回答）");
+  }).join("\n\n");
+
+  const prompt =
+"あなたはビジネス実務法務検定1級（論述式）の採点官です。実際の本試験の採点実態に即して、公平に部分点を与えながら採点してください。\n\n"+
+"■この試験の合格基準\n"+
+"・1問は50点満点。各問で25点（50%）以上、かつ共通2問＋選択2問の合計140点以上で合格。\n"+
+"・合格者の実際の得点は1問あたり28〜45点程度に分布する。完璧でなくても、要点を押さえれば35点前後は十分到達し得る。過度に辛くしない。\n\n"+
+"■採点の大原則（本試験の実態に基づく）\n"+
+"・最重要は「設問の問いに正面から答えているか」。結論を明示し、聞かれたことに答えてさえいれば、文章が簡潔でも相応の部分点を与える。\n"+
+"・法的三段論法（規範→あてはめ→結論）の順序や形式が崩れていても、内容で必要な要素が書けていれば減点しない。形式より中身を見る。\n"+
+"・分量の多寡では評価しない。簡潔でも要点を突いていれば高く評価する。\n\n"+
+"■設問の種類に応じて軸を変える\n"+
+"・知識・要件型（「根拠条文を示して説明せよ」「要件を論じよ」等）→ 適用条文の指摘と要件の正確さを重視。条文番号が示されていれば加点（条文名だけでも部分点）。\n"+
+"・実務判断型（「どう対応すべきか」「とり得る手段を述べよ」等）→ 条文の厳密さより、事案に即した妥当な結論・実務的な解決策を重視。条文が無くても妥当なら加点する。\n\n"+
+"■各小問の評価観点（満点内で配分。合計を totalScore=50点とする）\n"+
+"① 論点把握: 設問が問う争点を捉えているか（捉えていれば加点、外すと大きく失点）。\n"+
+"② 規範: 適用される条文・ルールを示せているか（条文番号は加点。無くても妥当なルールを述べていれば部分点）。\n"+
+"③ あてはめ: 事例の事実を使って具体的に論じているか（事実への言及があれば加点）。\n"+
+"④ 結論: 問いに対応する結論を明示しているか（最重視）。\n\n"+
+"■減点の考え方（厳しくしすぎない）\n"+
+"・未回答・白紙の小問のみ0点。\n"+
+"・結論だけで理由が全く無い場合は半分程度にとどめる（0点にはしない）。\n"+
+"・条文番号が無くても、内容が正しければ規範点を一定与える（特に実務判断型）。\n"+
+"・論点を取り違えている場合は、その小問を大きく減点する。\n"+
+"・模範解答はあくまで一例。表現や構成が違っても、論理が通り妥当なら同等に加点する。\n\n"+
+"■passLevel\n"+
+"・\"A\"=この1問が35点以上の合格上位水準／\"B\"=25〜34点の合格圏／\"C\"=13〜24点で足切りの危険／\"D\"=12点以下で要再学習。\n\n"+
+"■出力は次のJSONのみ（前後に文章・コードブロックを付けない）。日本語で具体的に記述する。\n"+
+"{\"totalScore\":<0-50, 各小問scoreの合計>,"+
+"\"breakdown\":{\"legalBasis\":<0-15 規範>,\"application\":<0-15 あてはめ>,\"logic\":<0-10 論点把握>,\"conclusion\":<0-10 結論>},"+
+"\"subEvals\":[{\"subQ\":<番号>,\"max\":<満点>,\"score\":<0-満点>,\"strengths\":\"答えられている点\",\"weaknesses\":\"惜しい点・改善点\",\"missingPoints\":\"書けると更に加点される論点・条文\"}],"+
+"\"overallComment\":\"総合講評。各問25点の足切りと140点の合格ラインに照らした現状の到達度と、次に強化すべき点を2〜3文で具体的に。\","+
+"\"passLevel\":\"<A|B|C|D>\"}\n\n"+
+"【事例】\n"+scenario+"\n\n【設問と受験者の答案】\n"+qa+"\n\n【模範解答（採点の参考。これと完全一致でなくてよい）】\n"+model+"\n\nJSON:";
+
   const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+modelId+':generateContent?key='+key, {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.2,maxOutputTokens:4096}})
+    body: JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.1,maxOutputTokens:4096}})
   });
   if (!r.ok) throw new Error('API '+r.status);
   const d = await r.json();
   const t = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  return JSON.parse(t.replace(/```json\n?/g,'').replace(/```/g,'').trim());
+  var res = JSON.parse(t.replace(/```json\n?/g,'').replace(/```/g,'').trim());
+  // 整合性の後処理: subEvalsのscore合計をtotalScoreの正とし、0-50にクランプ
+  if (Array.isArray(res.subEvals) && res.subEvals.length) {
+    var sum = res.subEvals.reduce(function(a,e){ return a + (Number(e.score)||0); }, 0);
+    if (Number.isFinite(sum)) res.totalScore = Math.max(0, Math.min(50, Math.round(sum)));
+  } else if (typeof res.totalScore==='number') {
+    res.totalScore = Math.max(0, Math.min(50, Math.round(res.totalScore)));
+  }
+  res._maxes = maxes;
+  return res;
 }
 
 // ═══ Quiz Actions ═══
@@ -436,7 +489,7 @@ function trNext() {
 // ═══ Render ═══
 function render() {
   const app = document.getElementById('app');
-  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v105</span></p></div>';
+  let h = '<div class="hdr"><h1>法務検定 学習</h1><p>ビジネス実務法務検定試験® 学習＆演習 <span style="color:#9e7c0c">v108</span></p></div>';
 
   if (S.view==='home') {
     const g2n=S.data.g2?.length||0, g1n=(S.data.g1?.common?.length||0)+(S.data.g1?.selection?.length||0);
@@ -519,13 +572,65 @@ function render() {
     const tr1=S.data.tr?.grade1||[];
     h += '<div class="bc"><a onclick="goHome()">ホーム</a> › <span class="tg tg-r">1級</span></div>';
     h += '<div class="stitle">1級 — 学習メニュー</div>';
-    h += '<div class="advice"><h3>📚 1級の学習ステップ</h3><b>①毎日5分</b>: 論点発見・条文番号・要件チェック<br><b>②毎日10分</b>: 短文論述<br><b>③週末90分</b>: 本番演習＋AI添削</div>';
+    h += '<div class="advice"><h3>📋 試験概要（東京商工会議所）</h3>'+
+      '<b>形式</b>: 全問論述式（CBT統一試験・年1回）<br>'+
+      '<b>構成</b>: 前半=共通問題90分（2問・必須）／後半=選択問題90分（4問中2問選択）<br>'+
+      '<b>配点</b>: 共通2問＋選択2問の計200点満点<br>'+
+      '<b>合格</b>: 各問50%以上 かつ 合計140点以上<br>'+
+      '<b>準1級</b>: 110〜139点（または50%未満の問がある合格点未満者）<br>'+
+      '<b>範囲</b>: 1〜3級全範囲（民法・商法・会社法が中心）<br>'+
+      '<span style="font-size:13px;color:var(--ink2)">※2026年度・第60回は12月6日（日）実施。最新の日程・要項は公式サイトで必ず確認してください。</span></div>';
+    h += '<div class="advice"><h3>✍️ 1級の学習ステップ</h3><b>①毎日5分</b>: 論点発見・条文番号・要件チェック<br><b>②毎日10分</b>: 答案構成（IRAC）の型づくり<br><b>③週末90分</b>: 本番演習＋AI添削</div>';
     h += '<div class="ml">';
+    h += '<button class="cb gd" style="border-color:var(--gd)" onclick="go(\'g1guide\')"><span>📐 答案構成ガイド（IRAC）＆チェックリスト</span><span class="n">必読</span></button>';
     h += '<button class="cb or" onclick="startTr(S.data.tr.grade1,\'all\')"><span>🏋️ 1級トレーニング</span><span class="n">'+tr1.length+'問</span></button>';
-    h += '<button class="cb all" onclick="start1(\'common\')"><span>共通問題（民法+会社法）</span><span class="n">2問</span></button>';
-    h += '<button class="cb" onclick="start1(\'select\')"><span>選択問題</span><span class="n">4問</span></button>';
-    h += '<button class="cb" onclick="start1(\'full\')"><span>本試験モード</span><span class="n">4問</span></button>';
+    h += '<button class="cb all" onclick="start1(\'common\')"><span>共通問題（民法＋会社法・必須）</span><span class="n">'+(S.data.g1?.common?.length||0)+'問</span></button>';
+    h += '<button class="cb" onclick="start1(\'select\')"><span>選択問題（本番は4問中2問選択）</span><span class="n">'+(S.data.g1?.selection?.length||0)+'問</span></button>';
+    h += '<button class="cb" onclick="start1(\'full\')"><span>本試験モード（共通2＋選択2）</span><span class="n">200点</span></button>';
     h += '</div>';
+
+  } else if (S.view==='g1guide') {
+    h += '<div class="bc"><a onclick="goHome()">ホーム</a> › <a onclick="go(\'g1menu\')">1級</a> › 答案構成ガイド</div>';
+    h += '<div class="stitle">答案構成ガイド（IRAC法）</div>';
+    h += '<div class="advice"><h3>🎯 なぜ「型」が必要か</h3>1級は知識量ではなく「事例を法的に処理して文章で示す力」を採点します。白紙から書くのではなく、毎回同じ<b>型</b>に事実を流し込むのが合格答案の近道です。</div>';
+    h += '<div style="background:#fff;border:1.5px solid var(--bg2);border-radius:var(--r);padding:16px;margin-bottom:12px;line-height:1.9;font-size:16px">';
+    h += '<div style="font-family:\'Noto Serif JP\',serif;font-size:19px;font-weight:700;margin-bottom:10px">IRAC ＝ 答案の背骨</div>';
+    h += '<div style="margin-bottom:10px"><b style="color:var(--bl)">I — Issue（論点）</b><br>事案から「何が法的に問題か」を一文で示す。「本件では、〜が認められるかが問題となる。」</div>';
+    h += '<div style="margin-bottom:10px"><b style="color:var(--bl)">R — Rule（規範）</b><br>適用条文・要件・判例を示す。条文番号は必ず明記（例: 民法562条）。「〜については、〇条が△△と定める。」</div>';
+    h += '<div style="margin-bottom:10px"><b style="color:var(--bl)">A — Application（あてはめ）</b><br>事実を要件に一つずつ対応させる。ここが配点の中心。「本件では、〜という事実があるため、要件①を満たす。」</div>';
+    h += '<div><b style="color:var(--bl)">C — Conclusion（結論）</b><br>問いに正面から答える。「したがって、〜が認められる（認められない）。」</div>';
+    h += '</div>';
+    h += '<div class="advice"><h3>📝 解答前の3分テンプレ（メモ用）</h3>'+
+      '1. 当事者と請求を整理（誰が誰に何を）<br>'+
+      '2. 時系列を矢印で書く<br>'+
+      '3. 問われている論点を箇条書き<br>'+
+      '4. 各論点に条文番号を割り当てる<br>'+
+      '5. IRACの順で書き出す</div>';
+    h += '<div style="background:#fff8e8;border:1.5px solid var(--gd);border-radius:var(--r);padding:16px;margin-bottom:12px">';
+    h += '<div style="font-weight:700;color:var(--ink);margin-bottom:8px">✅ 提出前チェックリスト</div>';
+    var checks=['設問の問い全てに答えたか（小問の取りこぼしなし）','各論点に条文番号を示したか','要件を列挙し、事実を一つずつあてはめたか','反対の結論・例外にも触れたか','結論が問いに正面から対応しているか','「よって/したがって」で結論を明示したか','誤字・主語の欠落がないか'];
+    checks.forEach(function(c){ h += '<div style="font-size:15px;line-height:1.8;padding:2px 0">☐ '+esc(c)+'</div>'; });
+    h += '</div>';
+    h += '<div class="advice"><h3>⚠️ 減点されやすいポイント</h3>'+
+      '・論点を取り違える（一番痛い。問いを読み違えない）<br>'+
+      '・聞かれたことに答えていない（設問とズレた記述）<br>'+
+      '・条文番号が抜けている／間違っている<br>'+
+      '・事実を引用せず一般論で終わる<br>'+
+      '・小問を一つ落とす（各問50%未満は準1級止まり）<br>'+
+      '・時間配分ミスで後半が空白</div>';
+    h += '<div style="background:#eef7ee;border:1.5px solid var(--ok);border-radius:var(--r);padding:16px;margin-bottom:12px">';
+    h += '<div style="font-weight:700;color:var(--ink);margin-bottom:8px">💡 合格者の鉄則（体験談より）</div>';
+    var tips=[
+      '時間が無くても「結論→根拠条文→簡単なあてはめ→よって」だけは書く。これだけで部分点が来て、ある合格者は選択問題で45/50を取った。',
+      '分量より中身。簡潔な記述でも、要点を突いていれば評価される。タイピング量で勝負しない。',
+      '「○○できるか」と問われたら、まず結論（できる／できない）を先に明示する。設問に答えている姿勢が最優先。',
+      '知識・要件型は条文ベースで、実務判断型（どう対応すべきか）は妥当な解決策ベースで書き分ける。',
+      'CBTでは問題文をコピペできる。事実の引用はコピペで時短し、あてはめに時間を回す。',
+      '六法は持込可。普段から使う条文に線を引き付箋を貼っておくと本番で引く時間を節約できる。'
+    ];
+    tips.forEach(function(t){ h += '<div style="font-size:15px;line-height:1.85;padding:3px 0">・'+esc(t)+'</div>'; });
+    h += '</div>';
+    h += '<div class="ctr"><button class="btn bo" onclick="go(\'g1menu\')">1級メニューに戻る</button></div>';
 
   } else if (S.view==='trMenu') {
     // 旧メニュー→テキストに転送
@@ -863,12 +968,15 @@ function render() {
     if(S.showMdl) h += '<div class="mdl"><div class="ml2">模範解答</div>'+esc(q.modelAns)+'</div>';
     if(S.gradeRes&&!S.gradeRes.error){
       const g=S.gradeRes;
+      const pass25 = g.totalScore>=25;
       h += '<div class="grd"><div class="ml2" style="color:var(--bl)">🤖 AI添削結果 <span style="font-size:13px;font-weight:400;color:var(--ink2)">('+(g._model||S.geminiModel)+')</span></div>';
       h += '<div class="gs"><span class="gsc">'+g.totalScore+'</span><span class="gsu">/50点</span>';
-      h += '<span class="glv glv-'+g.passLevel+'">'+({A:'合格水準',B:'あと一歩',C:'基礎力不足',D:'要学習'}[g.passLevel]||'')+'</span></div>';
-      if(g.breakdown)h+='<div class="gbd"><div>法的根拠:'+g.breakdown.legalBasis+'/15</div><div>あてはめ:'+g.breakdown.application+'/15</div><div>論理構成:'+g.breakdown.logic+'/10</div><div>結論:'+g.breakdown.conclusion+'/10</div></div>';
-      (g.subEvals||[]).forEach(se=>{h+='<div class="gse"><div style="font-weight:700">小問'+se.subQ+'('+se.score+'点)</div>';if(se.strengths)h+='<div>👍 '+esc(se.strengths)+'</div>';if(se.weaknesses)h+='<div style="color:var(--ng)">⚠ '+esc(se.weaknesses)+'</div>';if(se.missingPoints)h+='<div style="color:var(--gd)">📋 '+esc(se.missingPoints)+'</div>';h+='</div>';});
+      h += '<span class="glv glv-'+g.passLevel+'">'+({A:'合格水準',B:'あと一歩',C:'足切り域',D:'要学習'}[g.passLevel]||'')+'</span></div>';
+      h += '<div class="rp '+(pass25?'rph':'rpl')+'" style="margin:4px 0 10px">この1問の足切りライン: 25点（50%）'+(pass25?' ✓ 到達':' ✗ 未到達 → 1問でも未達だと不合格')+'</div>';
+      if(g.breakdown)h+='<div class="gbd"><div>論点抽出:'+g.breakdown.logic+'/10</div><div>規範(条文):'+g.breakdown.legalBasis+'/15</div><div>あてはめ:'+g.breakdown.application+'/15</div><div>結論:'+g.breakdown.conclusion+'/10</div></div>';
+      (g.subEvals||[]).forEach(se=>{var mx=se.max?('/'+se.max+'点'):'点';h+='<div class="gse"><div style="font-weight:700">小問'+se.subQ+'（'+se.score+mx+'）</div>';if(se.strengths)h+='<div>👍 '+esc(se.strengths)+'</div>';if(se.weaknesses)h+='<div style="color:var(--ng)">⚠ '+esc(se.weaknesses)+'</div>';if(se.missingPoints)h+='<div style="color:var(--gd)">📋 書くべき論点・条文: '+esc(se.missingPoints)+'</div>';h+='</div>';});
       if(g.overallComment)h+='<div style="margin-top:10px;padding:10px;background:#f8f6f0;border-radius:6px;font-size:15px;line-height:1.8"><b>総合講評:</b> '+esc(g.overallComment)+'</div>';
+      h+='<div style="margin-top:8px;font-size:12px;color:var(--ink2)">※AI採点は学習用の目安です。本番は共通2問＋選択2問＝200点、各問25点以上かつ合計140点で合格。</div>';
       h+='</div>';
     }
     if(S.gradeRes?.error)h+='<div class="exp eng"><div class="el">APIエラー</div><div>'+esc(S.gradeRes.error)+'</div></div>';
